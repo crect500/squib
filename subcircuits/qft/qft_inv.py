@@ -1,7 +1,4 @@
-from qiskit import QuantumCircuit,  \
-                    QuantumRegister, \
-                    ClassicalRegister
-from qiskit.circuit.library import HGate
+from qiskit import QuantumCircuit
 from math import pi
 
 
