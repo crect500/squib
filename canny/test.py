@@ -25,6 +25,29 @@ class TestUtils:
                             binary_number):
         assert utils.to_binary(number, bits) == binary_number
 
+    @pytest.mark.parametrize('number,binary_number',
+                             [(0, [False]),
+                              (-1, [True]),
+                              (1, [True, False]),
+                              (-4, [False, False, True])])
+    def test_to_twos_complement(self,
+                                number,
+                                binary_number):
+        assert utils.to_twos_complement(number) == binary_number
+
+    @pytest.mark.parametrize('number,bits,binary_number',
+                             [(0, 4, [False] * 4),
+                              (-1, 3, [True] * 3),
+                              (1, 5, [True] + [False] * 4),
+                              (-4, 3, [False, False, True]),
+                              (-5, 5, [True, False, True, True, True]),
+                              (6, 4, [False, True, True, False])])
+    def test_to_twos_complement_specified(self,
+                                number,
+                                bits,
+                                binary_number):
+        assert utils.to_twos_complement(number, bits) == binary_number
+
     @pytest.mark.parametrize('bit_string,binary_number',
                              [('010101', [True, False, True, False, True, False]),
                               ('00000', [False] * 5),

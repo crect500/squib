@@ -1,4 +1,5 @@
 from typing import Union, Tuple
+from math import log2
 
 from qiskit import QuantumCircuit as qc, \
                     QuantumRegister as qr
@@ -41,16 +42,45 @@ def to_binary(NUMBER: Union[int, str],
         else:
             binary_number.append(True)
 
-    if bits != -1 and len(binary_number) > bits:
-        raise ValueError('{} bits required store number {}'.format(len(binary_number), NUMBER))
-
-    if bits != -1 and len(binary_number) == bits:
-        return binary_number
-
     if bits != -1:
+        if len(binary_number) > bits:
+            raise ValueError('{} bits required store number {}'.format(len(binary_number), NUMBER))
+
+        if len(binary_number) == bits:
+            return binary_number
+
         binary_number = binary_number + [False]*(bits - len(binary_number))
 
     return binary_number
+
+
+def to_twos_complement(NUMBER: Union[int, str],
+                       bits: int = -1) -> list:
+    if bits != -1:
+        twos_binary = to_binary(abs(NUMBER))
+        if NUMBER == 0:
+            return [False] * bits
+
+        if len(twos_binary) > bits:
+            raise ValueError('{} bits required store number {}'.format(len(twos_binary), NUMBER))
+
+        if len(twos_binary) == bits and NUMBER > 0:
+            raise ValueError('{} bits required store number {}'.format(len(twos_binary) + 1, NUMBER))
+
+        if NUMBER > 0:
+            twos_binary = twos_binary + [False] * (bits - len(twos_binary))
+        else:
+            twos_binary = twos_binary + [True] * (bits - len(twos_binary))
+
+    else:
+        twos_binary = to_binary(abs(NUMBER))
+        if NUMBER < 0:
+            if not float.is_integer(log2(abs(NUMBER))):
+                twos_binary = twos_binary + [True]
+        elif NUMBER > 0:
+            twos_binary = twos_binary + [False]
+
+    return twos_binary
 
 
 def prep_binary_state(NUMBER: Union[int, str, list],
