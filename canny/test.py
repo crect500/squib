@@ -29,7 +29,8 @@ class TestUtils:
                              [(0, [False]),
                               (-1, [True]),
                               (1, [True, False]),
-                              (-4, [False, False, True])])
+                              (-4, [False, False, True]),
+                              (-3, [True, False, True])])
     def test_to_twos_complement(self,
                                 number,
                                 binary_number):
@@ -40,7 +41,7 @@ class TestUtils:
                               (-1, 3, [True] * 3),
                               (1, 5, [True] + [False] * 4),
                               (-4, 3, [False, False, True]),
-                              (-5, 5, [True, False, True, True, True]),
+                              (-5, 5, [True, True, False, True, True]),
                               (6, 4, [False, True, True, False])])
     def test_to_twos_complement_specified(self,
                                 number,
@@ -136,6 +137,22 @@ class TestUtils:
                              solution1,
                              solution2):
         test_solution1, test_solution2 = utils.prep_binary_operands(number1, number2)
+        assert test_solution1 == solution1
+        assert test_solution2 == solution2
+
+    @pytest.mark.parametrize('number1, number2, solution1, solution2',
+                             [(0, 2, [False] * 3, [False, True, False]),
+                              (2, 0, [False, True, False], [False] * 3),
+                              (5, 7, [True, False, True, False], [True, True, True, False]),
+                              (-1, 1, [True, True], [True, False]),
+                              (1, -1, [True, False], [True, True]),
+                              (-3, -4, [True, False, True], [False, False, True])])
+    def test_twos_complement_operands(self,
+                             number1,
+                             number2,
+                             solution1,
+                             solution2):
+        test_solution1, test_solution2 = utils.prep_twos_complement_operands(number1, number2)
         assert test_solution1 == solution1
         assert test_solution2 == solution2
 
