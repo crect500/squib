@@ -200,3 +200,10 @@ class TestOperations:
         assert circuit.qregs == test_circuit.qregs
         assert circuit.ancillas == test_circuit.ancillas
         assert circuit.num_qubits == test_circuit.num_qubits
+
+    def test_increment_state(self):
+        gate = operations.increment_state(4)
+        assert gate.num_qubits == 4
+        assert gate.definition.data[0].operation.name == 'mcx'
+        assert gate.definition.data[0].operation.num_qubits == 4
+        assert gate.definition.data[-1].operation.name == 'x'

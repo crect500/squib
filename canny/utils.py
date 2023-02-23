@@ -4,8 +4,24 @@ from math import log2
 from qiskit import QuantumCircuit as qc, \
                     QuantumRegister as qr
 
+
 def to_binary(NUMBER: Union[int, str],
               bits: int = -1) -> list:
+    """
+    Creates a list of booleans representing an unsigned binary integer.
+    The least significant bit is in the 0 index
+
+    Parameters
+    ----------
+    NUMBER : Union[int, str]
+        Natural number to be converted
+    bits : int
+        Number of bits to be returned
+
+    Returns
+    -------
+    list
+    """
     def reverse_and_convert(bit_string: str) -> list:
         binary_state = []
         for i in range(len(bit_string) - 1, -1, -1):
@@ -25,6 +41,9 @@ def to_binary(NUMBER: Union[int, str],
             binary_number = reverse_and_convert(NUMBER)
 
         return binary_number
+
+    if NUMBER < 0:
+        raise ValueError('Cannot represent {} as a unsigned binary number'.format(NUMBER))
 
     if NUMBER == 0 and bits != -1:
         return [False]*bits
@@ -56,6 +75,22 @@ def to_binary(NUMBER: Union[int, str],
 
 def to_twos_complement(NUMBER: Union[int, str],
                        bits: int = -1) -> list:
+    """
+    Creates a list of booleans representing a signed binary integer
+    in two's complement encoding the least significant bit is in the 0 index.
+
+
+    Parameters
+    ----------
+    NUMBER : Union[int, str]
+        Integer to be converted
+    bits : int
+        Number of bits to be returned
+
+    Returns
+    -------
+    list
+    """
     if bits != -1:
         if NUMBER == 0:
             return [False] * bits
@@ -82,13 +117,30 @@ def to_twos_complement(NUMBER: Union[int, str],
 
 
 def prep_binary_state(NUMBER: Union[int, str, list],
-                        bits: int) -> qc:
+                        bits: int,
+                        reverse: bool = False) -> qc:
+    """
+    Converts an unsigned integer into a quantum state of the size
+    specified by bits. The least significant bit is stored in the
+    first qubit
+
+    Parameters
+    ----------
+    NUMBER : Union[int, str, list]
+        Integer to be converted
+    bits : int
+        Number of bits to represent as qubits
+    """
+
     if type(NUMBER) != list:
         binary_state = to_binary(NUMBER, bits)
     elif len(NUMBER) < bits:
         binary_state = NUMBER + [False] * (bits - len(NUMBER))
     else:
         binary_state = NUMBER
+
+    if reverse:
+        binary_state.reverse()
 
     quantum_binary_state = qc(qr(bits, 'q0'))
     for i in range(0, bits):
@@ -100,6 +152,21 @@ def prep_binary_state(NUMBER: Union[int, str, list],
 
 def prep_binary_operands(NUMBER1: Union[int, str],
                          NUMBER2: Union[int, str]) -> Tuple[list, list]:
+    """
+    Creates two lists representing unsigned binary integers,
+    ensuring that they are the same length.
+
+    Parameters
+    ----------
+    NUMBER1 :
+        A natural number
+    NUMBER2 : Union[int, str]
+        A natural number
+
+    Returns
+    -------
+    Tuple[list, list]
+    """
     if not NUMBER1 and type(NUMBER1) is not int:
         raise ValueError('First operand does not contain a value')
     if not NUMBER2 and type(NUMBER2) is not int:
@@ -122,6 +189,21 @@ def prep_binary_operands(NUMBER1: Union[int, str],
 
 def prep_twos_complement_operands(NUMBER1: int,
                                   NUMBER2: int) -> Tuple[list, list]:
+    """
+    Creates two lists representing twos complement signed binary integers,
+    ensuring that they are the same length.
+
+    Parameters
+    ----------
+    NUMBER1 :
+        An integer
+    NUMBER2 : Union[int, str]
+        An integer
+
+    Returns
+    -------
+    Tuple[list, list]
+    """
     if not NUMBER1 and type(NUMBER1) is not int:
         raise ValueError('First operand does not contain a value')
     if not NUMBER2 and type(NUMBER2) is not int:

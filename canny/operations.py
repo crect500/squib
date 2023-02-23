@@ -3,7 +3,8 @@ from typing import Union
 from qiskit import QuantumCircuit as qc, \
                     QuantumRegister as qr, \
                     AncillaRegister as ar
-from qiskit.circuit import ControlledGate
+from qiskit.circuit import ControlledGate, \
+                            Gate
 from qiskit.circuit.library import XGate
 from qiskit.converters import circuit_to_gate as ctg
 
@@ -11,10 +12,27 @@ import utils
 
 
 def quant_compare_int(number1: Union[int, str],
-                          number2: Union[int, str]):
+                          number2: Union[int, str]) -> qc:
+    """
+    Creates a quantum circuit which encodes the comparison between two unsigned
+    binary integers as one of three binary states in the last 2-qubit register
+
+    00 : Numbers are equal
+    10 : First number is greater
+    01 : Second number is greater
+
+    Parameters
+    ----------
+    number1 : Union[int, str]
+        A natural number
+    number2 : Union[int, str]
+        A natural number
+
+    Returns
+    -------
+    qiskit.QuantumCircuit
+    """
     binary_number1, binary_number2 = utils.prep_binary_operands(number1, number2)
-    binary_number1.reverse()
-    binary_number2.reverse()
     n = len(binary_number1)
     m = 2 * n
 
@@ -27,8 +45,8 @@ def quant_compare_int(number1: Union[int, str],
     else:
         circuit = qc(qx, qy, qe)
 
-    binary_gate1 = ctg(utils.prep_binary_state(binary_number1, n), label='to_bin')
-    binary_gate2 = ctg(utils.prep_binary_state(binary_number2, n), label='to_bin')
+    binary_gate1 = ctg(utils.prep_binary_state(binary_number1, n, reverse=True), label='to_bin')
+    binary_gate2 = ctg(utils.prep_binary_state(binary_number2, n, reverse=True), label='to_bin')
 
     circuit.append(binary_gate1, qx)
     circuit.append(binary_gate2, qy)
@@ -61,3 +79,37 @@ def quant_compare_int(number1: Union[int, str],
             circuit.append(gate2, control)
 
     return circuit
+
+
+def increment_state(num_qubits: int,
+                    as_circuit: bool = False) -> Union[Gate, qc]:
+    """
+    Increments the binary number represented by the quantum state by 1
+
+    Parameters
+    ----------
+    num_qubits : qiskit.QuantumCircuit
+        The width of the quantum circuit representing a binary state,
+        with the least significant bit as the last qubit
+    as_circuit : bool
+        Optionally returns a circuit
+
+    Returns
+    -------
+    qiskit.QuantumCircuit
+    """
+    register = qr(num_qubits, 'q0')
+    circuit = qc(register)
+    for i in range(num_qubits - 1, 0, -1):
+        increment_gate = XGate().control(i)
+        qubit_list = []
+        for j in range(num_qubits - i, num_qubits):
+            qubit_list.append(j)
+        qubit_list.append(num_qubits - i - 1)
+        circuit.append(increment_gate, qubit_list)
+    circuit.x(num_qubits - 1)
+
+    if as_circuit:
+        return circuit
+
+    return ctg(circuit)
