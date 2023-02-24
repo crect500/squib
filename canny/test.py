@@ -207,3 +207,10 @@ class TestOperations:
         assert gate.definition.data[0].operation.name == 'mcx'
         assert gate.definition.data[0].operation.num_qubits == 4
         assert gate.definition.data[-1].operation.name == 'x'
+
+    def test_decrement_state(self):
+        gate = operations.decrement_state(4)
+        assert gate.num_qubits == 4
+        assert gate.definition.data[0].operation.name == 'x'
+        assert gate.definition.data[-1].operation.num_qubits == 4
+        assert gate.definition.data[-1].operation.name == 'mcx'

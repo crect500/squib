@@ -82,7 +82,8 @@ def quant_compare_int(number1: Union[int, str],
 
 
 def increment_state(num_qubits: int,
-                    as_circuit: bool = False) -> Union[Gate, qc]:
+                    as_circuit: bool = False,
+                    reverse: bool = False) -> Union[Gate, qc]:
     """
     Increments the binary number represented by the quantum state by 1
 
@@ -93,21 +94,65 @@ def increment_state(num_qubits: int,
         with the least significant bit as the last qubit
     as_circuit : bool
         Optionally returns a circuit
+    reverse: bool
+        Optionally use apply with the least significant bit as first qubit
 
     Returns
     -------
     qiskit.QuantumCircuit
     """
+    if reverse:
+        decrement_state(num_qubits, as_circuit=as_circuit)
+
     register = qr(num_qubits, 'q0')
     circuit = qc(register)
     for i in range(num_qubits - 1, 0, -1):
-        increment_gate = XGate().control(i)
+        gate = XGate().control(i)
         qubit_list = []
         for j in range(num_qubits - i, num_qubits):
             qubit_list.append(j)
         qubit_list.append(num_qubits - i - 1)
-        circuit.append(increment_gate, qubit_list)
+        circuit.append(gate, qubit_list)
     circuit.x(num_qubits - 1)
+
+    if as_circuit:
+        return circuit
+
+    return ctg(circuit)
+
+def decrement_state(num_qubits: int,
+                    as_circuit: bool = False,
+                    reverse: bool = False) -> Union[Gate, qc]:
+    """
+    Decrements the binary number represented by the quantum state by 1
+
+    Parameters
+    ----------
+    num_qubits : qiskit.QuantumCircuit
+        The width of the quantum circuit representing a binary state,
+        with the least significant bit as the last qubit
+    as_circuit : bool
+        Optionally returns a circuit
+    reverse: bool
+        Optionally use apply with the least significant bit as first qubit
+
+    Returns
+    -------
+    qiskit.QuantumCircuit
+    """
+    if reverse:
+        increment_state(num_qubits, as_circuit=as_circuit)
+        
+    register = qr(num_qubits, 'q0')
+    circuit = qc(register)
+    circuit.x(num_qubits - 1)
+    for i in range(1, num_qubits):
+        gate = XGate().control(i)
+        qubit_list = []
+        for j in range(num_qubits - 1, num_qubits - i - 1, -1):
+            qubit_list.append(j)
+        qubit_list.append(num_qubits - i - 1)
+        circuit.append(gate, qubit_list)
 
     if as_circuit:
         return circuit
