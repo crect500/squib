@@ -3,8 +3,7 @@ from typing import Union
 from qiskit import QuantumCircuit as qc, \
                     QuantumRegister as qr, \
                     AncillaRegister as ar
-from qiskit.circuit import ControlledGate, \
-                            Gate
+from qiskit.circuit import Gate
 from qiskit.circuit.library import XGate
 from qiskit.converters import circuit_to_gate as ctg
 
@@ -12,7 +11,8 @@ import utils
 
 
 def quant_compare_int(number1: Union[int, str],
-                          number2: Union[int, str]) -> qc:
+                      number2: Union[int, str],
+                      as_circuit: bool = False) -> Union[Gate, qc]:
     """
     Creates a quantum circuit which encodes the comparison between two unsigned
     binary integers as one of three binary states in the last 2-qubit register
@@ -27,11 +27,18 @@ def quant_compare_int(number1: Union[int, str],
         A natural number
     number2 : Union[int, str]
         A natural number
+    as_circuit: bool
+        Optionally returns a quantum circuit
 
     Returns
     -------
-    qiskit.QuantumCircuit
+    Union[qiskit.circuit.Gate, qiskit.QuantumCircuit]
     """
+    if number1 < 0:
+        raise ValueError('Operation is not supported for negative number {}'.format(number1))
+    if number2 < 0:
+        raise ValueError('Operation is not supported for negative number {}'.format(number2))
+
     binary_number1, binary_number2 = utils.prep_binary_operands(number1, number2)
     n = len(binary_number1)
     m = 2 * n
@@ -78,7 +85,10 @@ def quant_compare_int(number1: Union[int, str],
             control[-1] = qe[1]
             circuit.append(gate2, control)
 
-    return circuit
+    if as_circuit:
+        return circuit
+
+    return ctg(circuit, label='comp')
 
 
 def increment_state(num_qubits: int,
@@ -99,7 +109,7 @@ def increment_state(num_qubits: int,
 
     Returns
     -------
-    qiskit.QuantumCircuit
+    Union[qiskit.circuit.Gate, qiskit.QuantumCircuit]
     """
     if reverse:
         decrement_state(num_qubits, as_circuit=as_circuit)
@@ -118,7 +128,7 @@ def increment_state(num_qubits: int,
     if as_circuit:
         return circuit
 
-    return ctg(circuit)
+    return ctg(circuit, label='++')
 
 def decrement_state(num_qubits: int,
                     as_circuit: bool = False,
@@ -138,7 +148,7 @@ def decrement_state(num_qubits: int,
 
     Returns
     -------
-    qiskit.QuantumCircuit
+    Union[qiskit.circuit.Gate, qiskit.QuantumCircuit]
     """
     if reverse:
         increment_state(num_qubits, as_circuit=as_circuit)
@@ -157,4 +167,60 @@ def decrement_state(num_qubits: int,
     if as_circuit:
         return circuit
 
-    return ctg(circuit)
+    return ctg(circuit, label='--')
+
+
+def copy_state(num_qubits: int,
+               as_circuit: bool = False) -> Union[Gate, qc]:
+    """
+    Copies a state into an ancillary register
+
+    Parameters
+    ----------
+    num_qubits : qiskit.QuantumCircuit
+        The width of the quantum circuit representing a binary state,
+        with the least significant bit as the last qubit
+    as_circuit : bool
+        Optionally returns a circuit
+
+    Returns
+    -------
+    Union[qiskit.circuit.Gate, qiskit.QuantumCircuit]
+    """
+    register = qr(num_qubits, 'q0')
+    copy_register = qr(num_qubits, 'q1')
+    circuit = qc(register, copy_register)
+    for i in range(0, num_qubits):
+        circuit.cx(register[i], copy_register[i])
+
+    if as_circuit:
+        return circuit
+
+    return ctg(circuit, label='copy')
+
+
+def flip_state(num_qubits: int,
+               as_circuit: bool = False) -> Union[Gate, qc]:
+    """
+    Flips the state of all qubits
+
+    Parameters
+    ----------
+    num_qubits : qiskit.QuantumCircuit
+        The width of the quantum circuit representing a binary state,
+        with the least significant bit as the last qubit
+    as_circuit : bool
+        Optionally returns a circuit
+
+    Returns
+    -------
+    Union[qiskit.circuit.Gate, qiskit.QuantumCircuit]
+    """
+    register = qr(num_qubits, 'q0')
+    circuit = qc(register)
+    circuit.x(register)
+
+    if as_circuit:
+        return circuit
+
+    return ctg(circuit, label='flip')

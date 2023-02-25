@@ -163,7 +163,7 @@ class TestOperations:
         qy = qr(1, 'y')
         qe = ar(2, 'e')
         circuit = qc(qx, qy, qe)
-        test_circuit = operations.quant_compare_int(0, 0)
+        test_circuit = operations.quant_compare_int(0, 0, as_circuit=True)
         assert circuit.qregs == test_circuit.qregs
         assert circuit.ancillas == circuit.ancillas
         assert circuit.num_qubits == test_circuit.num_qubits
@@ -174,7 +174,7 @@ class TestOperations:
         qa = ar(4, 'a')
         qe = ar(2, 'e')
         circuit = qc(qx, qy, qa, qe)
-        test_circuit = operations.quant_compare_int(5, 6)
+        test_circuit = operations.quant_compare_int(5, 6, as_circuit=True)
         assert circuit.qregs == test_circuit.qregs
         assert circuit.ancillas == test_circuit.ancillas
         assert circuit.num_qubits == test_circuit.num_qubits
@@ -185,7 +185,7 @@ class TestOperations:
         qa = ar(4, 'a')
         qe = ar(2, 'e')
         circuit = qc(qx, qy, qa, qe)
-        test_circuit = operations.quant_compare_int(6, 1)
+        test_circuit = operations.quant_compare_int(6, 1, as_circuit=True)
         assert circuit.qregs == test_circuit.qregs
         assert circuit.ancillas == test_circuit.ancillas
         assert circuit.num_qubits == test_circuit.num_qubits
@@ -196,7 +196,7 @@ class TestOperations:
         qa = ar(4, 'a')
         qe = ar(2, 'e')
         circuit = qc(qx, qy, qa, qe)
-        test_circuit = operations.quant_compare_int(2, 5)
+        test_circuit = operations.quant_compare_int(2, 5, as_circuit=True)
         assert circuit.qregs == test_circuit.qregs
         assert circuit.ancillas == test_circuit.ancillas
         assert circuit.num_qubits == test_circuit.num_qubits
@@ -214,3 +214,20 @@ class TestOperations:
         assert gate.definition.data[0].operation.name == 'x'
         assert gate.definition.data[-1].operation.num_qubits == 4
         assert gate.definition.data[-1].operation.name == 'mcx'
+
+
+    @pytest.mark.parametrize('num_qubits',
+                             [1, 4, 8])
+    def test_copy_state(self, num_qubits):
+        gate = operations.copy_state(num_qubits)
+        assert gate.num_qubits == num_qubits * 2
+        assert gate.definition.data[0].operation.name == 'cx'
+        assert gate.definition.data[-1].operation.name == 'cx'
+
+    @pytest.mark.parametrize('num_qubits',
+                             [1, 4, 8])
+    def test_flip_state(self, num_qubits):
+        gate = operations.flip_state(num_qubits)
+        assert gate.num_qubits == num_qubits
+        assert gate.definition.data[0].operation.name == 'x'
+        assert gate.definition.data[-1].operation.name == 'x'
