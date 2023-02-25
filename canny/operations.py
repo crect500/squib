@@ -142,7 +142,7 @@ def decrement_state(num_qubits: int,
     """
     if reverse:
         increment_state(num_qubits, as_circuit=as_circuit)
-        
+
     register = qr(num_qubits, 'q0')
     circuit = qc(register)
     circuit.x(num_qubits - 1)
