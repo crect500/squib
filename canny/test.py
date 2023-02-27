@@ -231,3 +231,10 @@ class TestOperations:
         assert gate.num_qubits == num_qubits
         assert gate.definition.data[0].operation.name == 'x'
         assert gate.definition.data[-1].operation.name == 'x'
+
+    @pytest.mark.parametrize('num_qubits',
+                             [1, 4, 8])
+    def test_flip_plus_one(self, num_qubits):
+        gate = operations.flip_plus_one(num_qubits)
+        assert gate.num_qubits == num_qubits
+        assert gate.definition.data[0].operation.name == 'x'

@@ -111,6 +111,9 @@ def increment_state(num_qubits: int,
     -------
     Union[qiskit.circuit.Gate, qiskit.QuantumCircuit]
     """
+    if num_qubits < 1:
+        raise ValueError('Cannot create gate for non-positive number of qubits {}'.format(num_qubits))
+
     if reverse:
         decrement_state(num_qubits, as_circuit=as_circuit)
 
@@ -150,6 +153,9 @@ def decrement_state(num_qubits: int,
     -------
     Union[qiskit.circuit.Gate, qiskit.QuantumCircuit]
     """
+    if num_qubits < 1:
+        raise ValueError('Cannot create gate for non-positive number of qubits {}'.format(num_qubits))
+
     if reverse:
         increment_state(num_qubits, as_circuit=as_circuit)
 
@@ -187,6 +193,9 @@ def copy_state(num_qubits: int,
     -------
     Union[qiskit.circuit.Gate, qiskit.QuantumCircuit]
     """
+    if num_qubits < 1:
+        raise ValueError('Cannot create gate for non-positive number of qubits {}'.format(num_qubits))
+
     register = qr(num_qubits, 'q0')
     copy_register = qr(num_qubits, 'q1')
     circuit = qc(register, copy_register)
@@ -216,6 +225,9 @@ def flip_state(num_qubits: int,
     -------
     Union[qiskit.circuit.Gate, qiskit.QuantumCircuit]
     """
+    if num_qubits < 1:
+        raise ValueError('Cannot create gate for non-positive number of qubits {}'.format(num_qubits))
+
     register = qr(num_qubits, 'q0')
     circuit = qc(register)
     circuit.x(register)
@@ -224,3 +236,34 @@ def flip_state(num_qubits: int,
         return circuit
 
     return ctg(circuit, label='flip')
+
+
+def flip_plus_one(num_qubits: int,
+                  as_circuit: bool = False) -> Union[Gate, qc]:
+    """
+    Flips the state of all qubits and then increments the resultant state
+
+    Parameters
+    ----------
+    num_qubits : qiskit.QuantumCircuit
+        The width of the quantum circuit representing a binary state,
+        with the least significant bit as the last qubit
+    as_circuit : bool
+        Optionally returns a circuit
+
+    Returns
+    -------
+    Union[qiskit.circuit.Gate, qiskit.QuantumCircuit]
+    """
+    if num_qubits < 1:
+        raise ValueError('Cannot create gate for non-positive number of qubits {}'.format(num_qubits))
+
+    register = qr(num_qubits, 'q0')
+    circuit = qc(register)
+    circuit.x(register)
+    circuit.append(increment_state(num_qubits), register)
+
+    if as_circuit:
+        return circuit
+
+    return ctg(circuit, label='flip1')
