@@ -1,4 +1,4 @@
-# Quantum Utilities and Educational Learning Library (QUELL)
+# Scientific Quantum Utilities and Investigations Breakthough (SQUIB)
 
 ## Description
 
