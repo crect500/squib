@@ -1,0 +1,6 @@
+[packages]
+qnn = {editable = true, path = '.'}
+
+[dev-packages]
+# testing
+pytest = "*"

@@ -1,0 +1,16 @@
+[tool.ruff]
+lint.select = ["ALL"]
+lint.extend-ignore = [
+    "D211",     # One blank line before class
+    "D212",     # Multiline summary on second line
+    "S311",     # Allow pseudo-random numbers
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = [
+    "INP001",   # Do not use an __init__.py for unit test directory
+    "D100",     # Do not use module docstring in unit test files
+    "D103",     # Do not require method docstrings
+    "S101",     # Asserts needed for unit tests
+
+]
