@@ -181,7 +181,9 @@ def test_append_normalizer(cardinality: int, vector_size: int) -> None:
     max_norm: float = np.max(norms)
     new_vector_size: int = 2 ** ceil(log2(vecset.shape[1] + 1))
     new_vecset: np.ndarray = quclidean.append_normalizers(
-        vecset, new_vector_size, max_norm**2,
+        vecset,
+        new_vector_size,
+        max_norm**2,
     )
     assert len(vecset) == len(new_vecset)
     assert np.apply_along_axis(np.linalg.norm, axis=1, arr=new_vecset) == pytest.approx(
@@ -196,7 +198,9 @@ def test_append_normalizer(cardinality: int, vector_size: int) -> None:
     integers(min_value=1, max_value=15),
 )
 def test_build_unit_vectors(
-    vecset1_cardinality: int, vecset2_cardinality: int, vector_size: int,
+    vecset1_cardinality: int,
+    vecset2_cardinality: int,
+    vector_size: int,
 ):
     random_generator: np.random.Generator = np.random.default_rng()
     vecset1: np.ndarray = random_generator.normal(
@@ -207,10 +211,14 @@ def test_build_unit_vectors(
     )
     new_vecset1, new_vecset2, norm = quclidean.build_unit_vectors(vecset1, vecset2)
     assert np.apply_along_axis(
-        np.linalg.norm, axis=1, arr=new_vecset1,
+        np.linalg.norm,
+        axis=1,
+        arr=new_vecset1,
     ) == pytest.approx(np.ones(vecset1_cardinality))
     assert np.apply_along_axis(
-        np.linalg.norm, axis=1, arr=new_vecset2,
+        np.linalg.norm,
+        axis=1,
+        arr=new_vecset2,
     ) == pytest.approx(np.ones(vecset2_cardinality))
     assert new_vecset1[:, 0 : vecset1.shape[1]] * norm == pytest.approx(vecset1)
     assert new_vecset2[:, 0 : vecset2.shape[1]] * norm == pytest.approx(vecset2)
@@ -264,7 +272,7 @@ def test_retrieve_vectors(
 def test_multi_euclidean4d(vecset1: List[List[float]], vecset2: List[List[float]]):
     vecset1: np.ndarray = np.asarray(vecset1)
     vecset2: np.ndarray = np.asarray(vecset2)
-    test_solution: np.ndarray = quclidean.multi_euclidean4d(
+    test_solution: np.ndarray = quclidean.multi_euclidean(
         vecset1,
         vecset2,
         shots=65536,
@@ -292,7 +300,10 @@ def test_multi_euclidean4d(vecset1: List[List[float]], vecset2: List[List[float]
     ],
 )
 def test_create_partitions(
-    vectors: np.ndarray, jobs: int, first_vector_size: int, last_vector_size: int,
+    vectors: np.ndarray,
+    jobs: int,
+    first_vector_size: int,
+    last_vector_size: int,
 ) -> None:
     partitions: list[np.ndarray] = quclidean.create_partitions(vectors, jobs)
     assert len(partitions) == jobs
@@ -314,18 +325,25 @@ def test_create_partitions(
     ],
 )
 def test_multi_euclidean4d_from_gate(
-    vecset1: list[list[float]], vecset2: list[list[float]],
+    vecset1: list[list[float]],
+    vecset2: list[list[float]],
 ) -> None:
     vecset1_array: np.ndarray = np.asarray(vecset1)
     vecset2_array: np.ndarray = np.asarray(vecset2)
     normalized_vecset1, normalized_vecset2, norm = quclidean.build_unit_vectors(
-        vecset1_array, vecset2_array,
+        vecset1_array,
+        vecset2_array,
     )
     vecset2_circuit: QuantumCircuit = quclidean.create_vecset_gate(
-        normalized_vecset2, as_circuit=True,
+        normalized_vecset2,
+        as_circuit=True,
     )
-    test_solution: np.ndarray = quclidean.multi_euclidean4d_from_gate(
-        normalized_vecset1, vecset2_circuit, len(normalized_vecset2), norm, shots=2**20,
+    test_solution: np.ndarray = quclidean.multi_euclidean_from_gate(
+        normalized_vecset1,
+        vecset2_circuit,
+        len(normalized_vecset2),
+        norm,
+        shots=2**20,
     )
     for i, vec1 in enumerate(vecset1_array):
         for j, vec2 in enumerate(vecset2_array):
@@ -364,7 +382,9 @@ def test_multi_euclidean4d_from_gate(
     ],
 )
 def test_multi_circuit_multi_euclidean4d(
-    vecset1: List[List[float]], vecset2: List[List[float]], available_processors: int,
+    vecset1: List[List[float]],
+    vecset2: List[List[float]],
+    available_processors: int,
 ):
     vecset1: np.ndarray = np.asarray(vecset1)
     vecset2: np.ndarray = np.asarray(vecset2)
@@ -372,8 +392,11 @@ def test_multi_circuit_multi_euclidean4d(
     device_config.mode = "local"
     device_config.jobs = available_processors
     device_config.client = Client(LocalCluster(available_processors))
-    test_solution: np.ndarray = quclidean.multi_circuit_multi_euclidean4d(
-        vecset1, vecset2, shots=65536, device_config=device_config,
+    test_solution: np.ndarray = quclidean.multi_circuit_multi_euclidean(
+        vecset1,
+        vecset2,
+        shots=65536,
+        device_config=device_config,
     )
     for i, vec1 in enumerate(vecset1):
         for j, vec2 in enumerate(vecset2):

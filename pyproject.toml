@@ -3,6 +3,7 @@ lint.select = ["ALL"]
 lint.extend-ignore = [
     "D211",     # One blank line before class
     "D212",     # Multiline summary on second line
+    "EM101",    # Don't agree with readability concern
     "S311",     # Allow pseudo-random numbers
 ]
 

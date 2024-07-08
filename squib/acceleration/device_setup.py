@@ -1,27 +1,31 @@
+"""Provides configurations for parallel execution on devices."""
+
 from __future__ import annotations
 
 import logging
 import multiprocessing as mp
 from configparser import ConfigParser
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from dask.distributed import Client, LocalCluster
 from dask_jobqueue import SLURMCluster
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
 
 class DeviceConfig:
+    """Specifies the execution device parameters."""
 
-    """Specifies the execution device parameters"""
-
-    __slots__ = "config"
+    __slots__: tuple[str, ...] = ("config",)
 
     def __init__(self: DeviceConfig, config_filepath: Path) -> None:
         """Return the Device Config object."""
         self.config = ConfigParser().read(config_filepath)
 
-    def set_config(self: DeviceConfig, config: ConfigParser) -> None:
+    def set_config(self: DeviceConfig, config: ConfigParser) -> None:  # noqa: ARG002
         """Not implemented for this base class."""
         logger.error(
             "Set config should not be called directly from the DeviceConfigclass",
@@ -32,7 +36,6 @@ class DeviceConfig:
 
 
 class DaskConfig(DeviceConfig):
-
     """A config object which specifies information necessary to run Dask jobqueues."""
 
     __slots__ = ("mode", "jobs", "client", "backend")
@@ -47,7 +50,7 @@ class DaskConfig(DeviceConfig):
         self.jobs = None
         self.client = None
         self.backend = None
-        super(DaskConfig, self).__init__(config_filepath)
+        super().__init__(config_filepath)
 
     def set_config(self: DaskConfig, config: ConfigParser) -> None:
         """
