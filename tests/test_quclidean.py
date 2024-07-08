@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from math import ceil, log2, sqrt
-from typing import Dict, List
 
 import numpy as np
 import pytest
@@ -17,7 +16,7 @@ from squib.quclidean import quclidean
 
 
 @pytest.mark.parametrize(
-    "index,state",
+    ("index", "state"),
     [
         (0, [sqrt(1 / 2), sqrt(1 / 2)]),
         (1, [sqrt(1 / 2), sqrt(1 / 2)]),
@@ -27,7 +26,7 @@ from squib.quclidean import quclidean
         (6, [1 / 2, 1 / 2, 1 / 2, 1 / 2]),
     ],
 )
-def test_apply_state_to_index(index: int, state: list):
+def test_apply_state_to_index(index: int, state: list) -> None:
     backend: AerSimulator = AerSimulator()
     shots: int = 16384
     q: int = int(log2(len(state)))
@@ -77,7 +76,7 @@ def test_apply_state_to_index(index: int, state: list):
         ),
     ],
 )
-def test_encode_vectors(vecset: List[list]):
+def test_encode_vectors(vecset: list[list]) -> None:
     backend: AerSimulator = AerSimulator()
     shots: int = 16384
     n: int = ceil(log2(len(vecset)))
@@ -114,7 +113,7 @@ def test_encode_vectors(vecset: List[list]):
 
 
 @pytest.mark.parametrize(
-    "vecset1,vecset2",
+    ("vecset1", "vecset2"),
     [
         ([[sqrt(1 / 2), sqrt(1 / 2)]], [[sqrt(1 / 2), sqrt(1 / 2)]]),  # Test case 1
         ([[0, 1]], [[1, 0]]),
@@ -124,7 +123,7 @@ def test_encode_vectors(vecset: List[list]):
         ),
     ],
 )
-def test_multi_unit_euclidean(vecset1: List[list], vecset2: List[list]):
+def test_multi_unit_euclidean(vecset1: list[list], vecset2: list[list]) -> None:
     backend: AerSimulator = AerSimulator()
     shots: int = 65536
     m: int = ceil(log2(len(vecset1)))
@@ -201,7 +200,7 @@ def test_build_unit_vectors(
     vecset1_cardinality: int,
     vecset2_cardinality: int,
     vector_size: int,
-):
+) -> None:
     random_generator: np.random.Generator = np.random.default_rng()
     vecset1: np.ndarray = random_generator.normal(
         size=(vecset1_cardinality, vector_size),
@@ -225,7 +224,7 @@ def test_build_unit_vectors(
 
 
 @pytest.mark.parametrize(
-    "set1_size,set2_size,results_dict,solution",
+    ("set1_size", "set2_size", "results_dict", "solution"),
     [
         (1, 1, {"00001": 1, "01001": 2}, [[3]]),
         (2, 2, {"00101": 1, "10101": 3}, [[0, 4], [0, 0]]),
@@ -242,9 +241,9 @@ def test_build_unit_vectors(
 def test_retrieve_vectors(
     set1_size: int,
     set2_size: int,
-    results_dict: Dict[str, int],
-    solution: List[List[float]],
-):
+    results_dict: dict[str, int],
+    solution: list[list[float]],
+) -> None:
     test_solution: np.ndarray = quclidean.retrieve_vectors(
         set1_size,
         set2_size,
@@ -257,7 +256,7 @@ def test_retrieve_vectors(
 
 
 @pytest.mark.parametrize(
-    "vecset1,vecset2",
+    ("vecset1", "vecset2"),
     [
         ([[1.0, 2.0, 3.0]], [[1.0, 2.0, 3.0]]),
         ([[1.0, 2.0, 3.0]], [[3.0, 4.0, 5.0]]),
@@ -269,7 +268,9 @@ def test_retrieve_vectors(
         ),
     ],
 )
-def test_multi_euclidean4d(vecset1: List[List[float]], vecset2: List[List[float]]):
+def test_multi_euclidean4d(
+    vecset1: list[list[float]], vecset2: list[list[float]],
+) -> None:
     vecset1: np.ndarray = np.asarray(vecset1)
     vecset2: np.ndarray = np.asarray(vecset2)
     test_solution: np.ndarray = quclidean.multi_euclidean(
@@ -312,7 +313,7 @@ def test_create_partitions(
 
 
 @pytest.mark.parametrize(
-    "vecset1,vecset2",
+    ("vecset1", "vecset2"),
     [
         ([[1.0, 2.0, 3.0]], [[1.0, 2.0, 3.0]]),
         ([[1.0, 2.0, 3.0]], [[3.0, 4.0, 5.0]]),
@@ -382,10 +383,10 @@ def test_multi_euclidean4d_from_gate(
     ],
 )
 def test_multi_circuit_multi_euclidean4d(
-    vecset1: List[List[float]],
-    vecset2: List[List[float]],
+    vecset1: list[list[float]],
+    vecset2: list[list[float]],
     available_processors: int,
-):
+) -> None:
     vecset1: np.ndarray = np.asarray(vecset1)
     vecset2: np.ndarray = np.asarray(vecset2)
     device_config: DaskConfig = DaskConfig("fake_filepath")
@@ -410,7 +411,7 @@ def test_multi_circuit_multi_euclidean4d(
 
 
 @pytest.mark.parametrize(
-    ("list1, list2, quant_results, solution"),
+    ("list1", "list2", "quant_results", "solution"),
     [
         ([[0, 0, 0]], [[0, 0, 0]], {"00001": 0, "01001": 0, "10001": 0}, 0),
         ([[1, 0, 0]], [[1, 0, 0]], {"00001": 0, "01001": 0, "10001": 0}, 0),
@@ -432,11 +433,11 @@ def test_multi_circuit_multi_euclidean4d(
     ],
 )
 def test_find_error_results(
-    list1: List[np.ndarray],
-    list2: List[np.ndarray],
-    quant_results: Dict[str, int],
+    list1: list[np.ndarray],
+    list2: list[np.ndarray],
+    quant_results: dict[str, int],
     solution: float,
-):
+) -> None:
     list1: np.ndarray = np.asarray(list1)
     list2: np.ndarray = np.asarray(list2)
     distances: np.ndarray = quclidean.retrieve_vectors(
