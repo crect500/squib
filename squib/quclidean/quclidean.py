@@ -642,7 +642,7 @@ def multi_euclidean_from_gate(  # noqa: PLR0913
     )
 
 
-def distributed_multi_euclidean(    # noqa: PLR0913
+def distributed_multi_euclidean(  # noqa: PLR0913
     vecset1_partitions: list[np.ndarray],
     vecset2: np.ndarray,
     device_config: DaskConfig,
