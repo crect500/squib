@@ -53,7 +53,7 @@ def apply_state_to_index(  # noqa: PLR0913
     if not backend:
         backend = AerSimulator()
     q: float = log2(len(vec))
-    if not q.is_integer():
+    if not q.is_integer() or q == 0:
         raise ValueError(
             "The input vector size must be a power of 2. "
             "They are of length " + str(len(vec)),
@@ -235,7 +235,7 @@ def multi_unit_euclidean(
     if n == 0:
         n = 1
     q: float = log2(length)
-    if not q.is_integer():
+    if not q.is_integer() or q == 0:
         raise ValueError(
             "The input vector size must be a power of 2."
             " They are of length " + str(length),
@@ -249,22 +249,24 @@ def multi_unit_euclidean(
     qc.h(qr1)
     qc.h(qr2)
     qc.h(qr3)
-    vector_gates: Gate = encode_vectors(
+    vector_circuit: Gate = encode_vectors(
         vecset1,
         m,
         0,
         backend=backend,
         device_config=device_config,
+        as_circuit=True,
     )
-    qc.append(vector_gates, [*qr1, *qr2, *qr4])
-    vector_gates: Gate = encode_vectors(
+    qc.compose(vector_circuit, [*qr1, *qr2, *qr4], inplace=True)
+    vector_circuit: Gate = encode_vectors(
         vecset2,
         n,
         1,
         backend=backend,
         device_config=device_config,
+        as_circuit=True,
     )
-    qc.append(vector_gates, [*qr1, *qr3, *qr4])
+    qc.compose(vector_circuit, [*qr1, *qr3, *qr4], inplace=True)
     qc.h(qr1)
 
     if as_circuit:
@@ -273,7 +275,7 @@ def multi_unit_euclidean(
     return qc.to_gate()
 
 
-def append_normalizers(
+def _append_normalizers(
     vecset: np.ndarray,
     new_vector_size: int,
     norm_squared: float,
@@ -326,7 +328,7 @@ def append_normalizers(
     return new_vecset
 
 
-def build_unit_vectors(
+def _build_unit_vectors(
     vecset1: np.ndarray,
     vecset2: np.ndarray,
 ) -> tuple[np.ndarray, np.ndarray, float]:
@@ -365,15 +367,25 @@ def build_unit_vectors(
     norm_squared: float = norm**2
     new_vector_size: int = 2 ** ceil(log2(vecset1.shape[1] + 1))
 
-    new_vecset1: np.ndarray = append_normalizers(vecset1, new_vector_size, norm_squared)
-    new_vecset2: np.ndarray = append_normalizers(vecset2, new_vector_size, norm_squared)
+    new_vecset1: np.ndarray = _append_normalizers(
+        vecset1,
+        new_vector_size,
+        norm_squared,
+    )
+    new_vecset2: np.ndarray = _append_normalizers(
+        vecset2,
+        new_vector_size,
+        norm_squared,
+    )
 
     return new_vecset1, new_vecset2, norm
 
 
-def retrieve_vectors(
+def _retrieve_vectors(
     set1_size: int,
     set2_size: int,
+    vector_size: int,
+    vector_qubits: int,
     results: dict[str, int],
 ) -> [np.ndarray]:
     """
@@ -383,6 +395,8 @@ def retrieve_vectors(
     ----
     set1_size: The number of vectors in the first set
     set2_size: The number of vectors in the second set
+    vector_size: The size of the vectors within each set
+    vector_qubits: The qybit quantity of the vector data register
     results: The results of a quantum circuit
 
     Returns:
@@ -400,23 +414,15 @@ def retrieve_vectors(
     distance_matrix: np.ndarray = np.zeros((set1_size, set2_size), dtype=np.float64)
     for i in range(set1_size):
         for j in range(set2_size):
-            index_string: str = f"{j:b}"
-            index_string = ("0" * (n - len(index_string))) + index_string
-            partial_index_string: str = f"{i:b}"
-            partial_index_string = (
-                "0" * (m - len(partial_index_string))
-            ) + partial_index_string
+            index_string: str = f"{j:0{n}b}"
+            partial_index_string: str = f"{i:0{m}b}"
             index_string += partial_index_string + "1"
             total: float = 0
-            for k in range(3):
-                partial_index_string: str = f"{k:b}"
-                partial_index_string = (
-                    "0" * (2 - len(partial_index_string))
-                ) + partial_index_string
-                try:
-                    total += results[partial_index_string + index_string]
-                except KeyError:
-                    continue
+            for k in range(vector_size):
+                vector_index_string = f"{k:0{vector_qubits}b}" + index_string
+                retrieved_value: int = results.get(vector_index_string)
+                if retrieved_value is not None:
+                    total += retrieved_value
             distance_matrix[i][j] = total
 
     return distance_matrix
@@ -452,22 +458,30 @@ def multi_euclidean(
         backend = AerSimulator()
     if vecset1.ndim == 1:
         vecset1.resize((1, vecset1.shape[0]))
-    vecset1, vecset2, norm = build_unit_vectors(vecset1, vecset2)
+    vector_size: int = vecset1.shape[1]
+    vecset1, vecset2, norm = _build_unit_vectors(vecset1, vecset2)
     m: int = ceil(log2(len(vecset1)))
     if m == 0:
         m = 1
     n: int = ceil(log2(len(vecset2)))
     if n == 0:
         n = 1
+    vector_qubits: int = ceil(log2(vector_size + 1))
     qr1: QuantumRegister = QuantumRegister(1, "a")
     qr2: QuantumRegister = QuantumRegister(m, "i")
     qr3: QuantumRegister = QuantumRegister(n, "j")
-    qr4: QuantumRegister = QuantumRegister(2, "vec")
-    cr: ClassicalRegister = ClassicalRegister(m + n + 3)
+    qr4: QuantumRegister = QuantumRegister(vector_qubits, "vec")
+    cr: ClassicalRegister = ClassicalRegister(m + n + vector_qubits + 1)
     qc: QuantumCircuit = QuantumCircuit(qr1, qr2, qr3, qr4, cr)
-    qc.append(
-        multi_unit_euclidean(vecset1, vecset2, device_config=device_config),
+    qc.compose(
+        multi_unit_euclidean(
+            vecset1,
+            vecset2,
+            device_config=device_config,
+            as_circuit=True,
+        ),
         [*qr1, *qr2, *qr3, *qr4],
+        inplace=True,
     )
     qc.measure([*qr1, *qr2, *qr3, *qr4], cr)
     logger.warning("Transpiling")
@@ -495,16 +509,21 @@ def multi_euclidean(
             backend.run(transpiled_circuit, shots=shots).result().get_counts()
         )
     distances: np.ndarray = (
-        (retrieve_vectors(len(vecset1), len(vecset2), result))
+        _retrieve_vectors(
+            len(vecset1),
+            len(vecset2),
+            vector_size,
+            vector_qubits,
+            result,
+        )
         * 2 ** (m + n + 2)
         * norm**2
-        / shots
-    )
+    ) / shots
 
     return distances
 
 
-def create_partitions(vecset: np.ndarray, available_jobs: int) -> list[np.ndarray]:
+def _create_partitions(vecset: np.ndarray, available_jobs: int) -> list[np.ndarray]:
     """
     Split vector set into partitions to be scattered as tasks.
 
@@ -540,13 +559,13 @@ def create_partitions(vecset: np.ndarray, available_jobs: int) -> list[np.ndarra
     return vecset_partitions
 
 
-def create_vecset_gate(
+def _create_vecset_gate(
     vecset: np.ndarray,
     backend: AerSimulator | None = None,
     device_config: DaskConfig | None = None,
     *,
     as_circuit: bool = False,
-) -> Gate:
+) -> Gate | QuantumCircuit:
     """
     Create a gate to encode only one vector set.
 
@@ -583,6 +602,7 @@ def multi_euclidean_from_gate(  # noqa: PLR0913
     vecset1: np.ndarray,
     vecset2_circuit: QuantumCircuit,
     vecset2_size: int,
+    vector_size: int,
     norm: float,
     backend: AerSimulator | None = None,
     shots: int = 16384,
@@ -595,6 +615,7 @@ def multi_euclidean_from_gate(  # noqa: PLR0913
     vecset1: A list of three-dimensional vectors.
     vecset2_circuit: A circuit encoding a list of three-dimensional vectors
     vecset2_size: The size of the second vector set
+    vector_size: The size of the original vector
     norm: The norm of all the modified vectors
     backend: The executor backend
     shots: The number of times to measure the executed circuit
@@ -610,11 +631,12 @@ def multi_euclidean_from_gate(  # noqa: PLR0913
     n: int = ceil(log2(vecset2_size))
     if n == 0:
         n = 1
+    vector_qubits: int = ceil(log2(vector_size + 1))
     qr1: QuantumRegister = QuantumRegister(1, "a")
     qr2: QuantumRegister = QuantumRegister(m, "i")
     qr3: QuantumRegister = QuantumRegister(n, "j")
-    qr4: QuantumRegister = QuantumRegister(2, "vec")
-    cr: ClassicalRegister = ClassicalRegister(m + n + 3)
+    qr4: QuantumRegister = QuantumRegister(vector_qubits, "vec")
+    cr: ClassicalRegister = ClassicalRegister(m + n + vector_qubits + 1)
     qc: QuantumCircuit = QuantumCircuit(qr1, qr2, qr3, qr4, cr)
     qc.h(qr1)
     qc.h(qr2)
@@ -635,7 +657,15 @@ def multi_euclidean_from_gate(  # noqa: PLR0913
     logger.warning("Executing")
     result: dict = backend.run(qc, shots=shots).result().get_counts()
     return (
-        (retrieve_vectors(len(vecset1), vecset2_size, result))
+        (
+            _retrieve_vectors(
+                len(vecset1),
+                vecset2_size,
+                vector_size,
+                vector_qubits,
+                result,
+            )
+        )
         * 2 ** (m + n + 2)
         * norm**2
         / shots
@@ -645,6 +675,7 @@ def multi_euclidean_from_gate(  # noqa: PLR0913
 def distributed_multi_euclidean(  # noqa: PLR0913
     vecset1_partitions: list[np.ndarray],
     vecset2: np.ndarray,
+    vector_size: int,
     device_config: DaskConfig,
     norm: float,
     backend: AerSimulator | None = None,
@@ -658,6 +689,7 @@ def distributed_multi_euclidean(  # noqa: PLR0913
     ----
     vecset1_partitions: Partitioned vector sets
     vecset2: A list of vectors.
+    vector_size: The size of the original vector
     device_config: The configuration of the executor
     norm: The norm of all the modified vectors
     backend: The executor backend
@@ -668,7 +700,7 @@ def distributed_multi_euclidean(  # noqa: PLR0913
     The Euclidean distances as a 2D array
 
     """
-    vecset2_circuit: Gate = create_vecset_gate(
+    vecset2_circuit: Gate = _create_vecset_gate(
         vecset2,
         device_config=device_config,
         as_circuit=True,
@@ -688,6 +720,7 @@ def distributed_multi_euclidean(  # noqa: PLR0913
         vecset1_partitions_scattered,
         [vecset2_circuit] * len(vecset1_partitions),
         [len(vecset2)] * len(vecset1_partitions),
+        [vector_size] * len(vecset1_partitions),
         [norm] * len(vecset1_partitions),
         backend_scattered,
         [shots] * len(vecset1_partitions),
@@ -737,14 +770,16 @@ def multi_circuit_multi_euclidean(
         backend = AerSimulator()
     distances: np.ndarray = np.ndarray((len(vecset1), len(vecset2)), dtype=np.float64)
     if device_config:
-        vecset1, vecset2, norm = build_unit_vectors(vecset1, vecset2)
-        vecset1_partitions: list[np.ndarray] = create_partitions(
+        vecset1, vecset2, norm = _build_unit_vectors(vecset1, vecset2)
+        vector_size: int = vecset1.shape[1]
+        vecset1_partitions: list[np.ndarray] = _create_partitions(
             vecset1,
             device_config.jobs,
         )
         distances = distributed_multi_euclidean(
             vecset1_partitions,
             vecset2,
+            vector_size,
             device_config=device_config,
             norm=norm,
             backend=backend,

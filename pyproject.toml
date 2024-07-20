@@ -13,5 +13,5 @@ lint.extend-ignore = [
     "D100",     # Do not use module docstring in unit test files
     "D103",     # Do not require method docstrings
     "S101",     # Asserts needed for unit tests
-
+    "SLF001",   # Allow access to private methods for testing
 ]
