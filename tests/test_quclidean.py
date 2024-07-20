@@ -199,7 +199,7 @@ def test_build_unit_vectors(
     vecset2: np.ndarray = random_generator.normal(
         size=(vecset2_cardinality, vector_size),
     )
-    new_vecset1, new_vecset2, norm = quclidean._build_unit_vectors(vecset1, vecset2)
+    new_vecset1, new_vecset2, norm = quclidean.build_unit_vectors(vecset1, vecset2)
     assert np.apply_along_axis(
         np.linalg.norm,
         axis=1,
@@ -235,7 +235,7 @@ def test_retrieve_vectors(
     results_dict: dict[str, int],
     solution: list[list[float]],
 ) -> None:
-    test_solution: np.ndarray = quclidean._retrieve_vectors(
+    test_solution: np.ndarray = quclidean.retrieve_vectors(
         set1_size,
         set2_size,
         3,
@@ -319,7 +319,7 @@ def test_multi_euclidean_from_gate(
     vecset1: np.ndarray = random_generator.normal(size=(vecset1_size, 2**vector_qubits))
     vecset2: np.ndarray = random_generator.normal(size=(vecset2_size, 2**vector_qubits))
     vector_size: int = vecset1.shape[1]
-    normalized_vecset1, normalized_vecset2, norm = quclidean._build_unit_vectors(
+    normalized_vecset1, normalized_vecset2, norm = quclidean.build_unit_vectors(
         vecset1,
         vecset2,
     )
@@ -343,7 +343,9 @@ def test_multi_euclidean_from_gate(
                 assert test_solution[i][j] == pytest.approx(0, rel=2e-1, abs=2e-1)
             else:
                 assert test_solution[i][j] == pytest.approx(
-                    solution, rel=2e-1, abs=2e-1,
+                    solution,
+                    rel=2e-1,
+                    abs=2e-1,
                 )
 
 
@@ -415,7 +417,7 @@ def test_find_error_results(
     list1: np.ndarray = np.asarray(list1)
     list2: np.ndarray = np.asarray(list2)
     vector_qubits: int = ceil(log2(list1.shape[1] + 1))
-    distances: np.ndarray = quclidean._retrieve_vectors(
+    distances: np.ndarray = quclidean.retrieve_vectors(
         len(list1),
         len(list2),
         list1.shape[1],

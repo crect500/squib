@@ -328,7 +328,7 @@ def _append_normalizers(
     return new_vecset
 
 
-def _build_unit_vectors(
+def build_unit_vectors(
     vecset1: np.ndarray,
     vecset2: np.ndarray,
 ) -> tuple[np.ndarray, np.ndarray, float]:
@@ -381,7 +381,7 @@ def _build_unit_vectors(
     return new_vecset1, new_vecset2, norm
 
 
-def _retrieve_vectors(
+def retrieve_vectors(
     set1_size: int,
     set2_size: int,
     vector_size: int,
@@ -459,7 +459,7 @@ def multi_euclidean(
     if vecset1.ndim == 1:
         vecset1.resize((1, vecset1.shape[0]))
     vector_size: int = vecset1.shape[1]
-    vecset1, vecset2, norm = _build_unit_vectors(vecset1, vecset2)
+    vecset1, vecset2, norm = build_unit_vectors(vecset1, vecset2)
     m: int = ceil(log2(len(vecset1)))
     if m == 0:
         m = 1
@@ -509,7 +509,7 @@ def multi_euclidean(
             backend.run(transpiled_circuit, shots=shots).result().get_counts()
         )
     distances: np.ndarray = (
-        _retrieve_vectors(
+        retrieve_vectors(
             len(vecset1),
             len(vecset2),
             vector_size,
@@ -658,7 +658,7 @@ def multi_euclidean_from_gate(  # noqa: PLR0913
     result: dict = backend.run(qc, shots=shots).result().get_counts()
     return (
         (
-            _retrieve_vectors(
+            retrieve_vectors(
                 len(vecset1),
                 vecset2_size,
                 vector_size,
@@ -770,7 +770,7 @@ def multi_circuit_multi_euclidean(
         backend = AerSimulator()
     distances: np.ndarray = np.ndarray((len(vecset1), len(vecset2)), dtype=np.float64)
     if device_config:
-        vecset1, vecset2, norm = _build_unit_vectors(vecset1, vecset2)
+        vecset1, vecset2, norm = build_unit_vectors(vecset1, vecset2)
         vector_size: int = vecset1.shape[1]
         vecset1_partitions: list[np.ndarray] = _create_partitions(
             vecset1,

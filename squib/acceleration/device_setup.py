@@ -36,7 +36,6 @@ class DeviceConfig:
 
 
 class DaskConfig(DeviceConfig):
-
     """A config object which specifies information necessary to run Dask jobqueues."""
 
     __slots__ = ("mode", "jobs", "client", "backend")
