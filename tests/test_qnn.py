@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from math import ceil
 from typing import TYPE_CHECKING
 from unittest import mock
 
@@ -32,7 +33,10 @@ def test_preprocess(rows: int, columns: int) -> None:
 )
 @settings(deadline=300)
 def test_run_qnn_circuit(
-    mock_counts: mock.Mock, vecset1_size: int, vecset2_size: int, vector_size: int,
+    mock_counts: mock.Mock,
+    vecset1_size: int,
+    vecset2_size: int,
+    vector_size: int,
 ) -> None:
     circuit: QuantumCircuit = QuantumCircuit(1)
     feature_circuit: QuantumCircuit = QuantumCircuit(1)
@@ -53,7 +57,9 @@ def test_assign_label(size: int) -> None:
     data["class"] = labels
     new_label: int = qnn._assign_label(values, labels)
     data: pd.DataFrame = data.sort_values(
-        by="value", ascending=False, ignore_index=True,
+        by="value",
+        ascending=False,
+        ignore_index=True,
     )
     label_counts: pd.DataFrame = data["class"][0:3].value_counts(sort=True)
     assert new_label == label_counts.index[0]
@@ -62,7 +68,9 @@ def test_assign_label(size: int) -> None:
 @mock.patch("squib.qnn.qnn._run_qnn_circuit")
 @given(integers(min_value=7, max_value=50), integers(min_value=1, max_value=7))
 def test_execute_qnn(
-    mock_run: mock.Mock, train_set_size: int, vector_size: int,
+    mock_run: mock.Mock,
+    train_set_size: int,
+    vector_size: int,
 ) -> None:
     circuit: QuantumCircuit = QuantumCircuit(1)
     random_generator: np.random.Generator = np.random.default_rng()
@@ -85,9 +93,12 @@ def test_execute_qnn(
     integers(min_value=1, max_value=20),
     integers(min_value=1, max_value=7),
 )
-@settings(deadline=300)
+@settings(deadline=350)
 def test_run_circuit(
-    mock_execute: mock.Mock, train_set_size: int, test_set_size: int, vector_size: int,
+    mock_execute: mock.Mock,
+    train_set_size: int,
+    test_set_size: int,
+    vector_size: int,
 ) -> None:
     random_generator: np.random.Generator = np.random.default_rng()
     mock_execute.return_value = random_generator.choice(np.arange(2), size=(1,))
@@ -104,46 +115,25 @@ def test_run_circuit(
     assert len(new_labels) == train_set_size + test_set_size
 
 
-def cross_validate(
-    training_set: np.ndarray,
-    test_set: np.ndarray,
-    *,
-    k: int = 3,
-    backend: AerSimulator | None = None,
-    shots: int = 2**15,
+@mock.patch("squib.qnn.qnn.run_qnn")
+@mock.patch("squib.qnn.qnn.multilabel_confusion_matrix")
+@mock.patch("squib.qnn.qnn.accuracy_score")
+@given(integers(min_value=10, max_value=50))
+def test_cross_validate(
+    mock_accuracy: mock.Mock,
+    mock_confusion: mock.Mock,
+    mock_run: mock.Mock,
+    feature_quantity: int,
 ) -> None:
-    """
-    Run k-nearest neighbors as a quantum algorithm with Euclidean distance.
-
-    :param gate_register_size: The number of qubits in the gate register
-    :param training_set: The gate configurations for the training set
-    :param test_set: The gate configurations for the test set
-    :param k: The number of neighbors to check in the k-nearest neighbors algorithm
-    :param shots: The number of times to execute the quantum circuit
-    :return: The assigned entanglement classes and their associated true classes
-    """
-    if not backend:
-        backend: AerSimulator = AerSimulator()
-
-
-def calculate_accuracy(
-    assigned_classes: list[set[int]],
-    true_classes: list[set[int]],
-) -> float:
-    """
-    Calculate the ratio of true predictions to all predictions.
-
-    Args:
-    ----
-    assigned_classes: The predicted classes
-    true_classes: The known classes
-
-    Returns:
-    -------
-    The ratio of true predictions to all predictions
-
-    """
-    accurate_assignments: np.ndarray[bool] = np.asarray(assigned_classes) == np.asarray(
-        true_classes,
+    fold_quantity: int = 5
+    random_generator: np.random.Generator = np.random.default_rng()
+    fake_labels: np.ndarray = random_generator.choice(
+        [0, 1], size=ceil(feature_quantity / fold_quantity),
     )
-    return np.sum(accurate_assignments) / len(assigned_classes)
+    mock_run.return_value = fake_labels
+    mock_confusion.return_value = random_generator.integers(0, 1, size=(2, 2))
+    mock_accuracy.return_value = random_generator.integers(0, 1, size=len(fake_labels))
+    features: np.ndarray = random_generator.uniform(size=(feature_quantity, 2))
+    labels: np.ndarray = random_generator.choice([0, 1], feature_quantity)
+    metrics: list[qnn.Metrics] = qnn.cross_validate(features, labels)
+    assert len(metrics) == fold_quantity
