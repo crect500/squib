@@ -10,7 +10,7 @@ import numpy as np
 from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister
 from qiskit.circuit.library import StatePreparation
 from qiskit.compiler import transpile
-from qiskit_aer import AerSimulator
+from qiskit_aer import AerSimulator, StatevectorSimulator
 
 if TYPE_CHECKING:
     from qiskit.circuit import Gate
@@ -73,6 +73,8 @@ def apply_state_to_index(  # noqa: PLR0913
     qc.append(controlled_gate, [*qr1, *qr2, *qr3])
 
     if as_circuit:
+        if isinstance(backend, StatevectorSimulator):
+            return transpile(qc, backend=backend)
         return transpile(qc, backend=backend, optimization_level=3)
 
     return transpile(qc, backend=backend, optimization_level=3).to_gate(label="index")
@@ -135,10 +137,10 @@ def encode_vectors(  # noqa: PLR0913
         futures.clear()
         for i, vector_circuit in enumerate(circuit_list):
             logging.warning("Appending circuit %s / %s\r", str(i), str(len(vecset) - 1))
-            qc.compose(vector_circuit, [*qr1, *qr2, *qr3], inplace=True)
+            qc.compose(vector_circuit, inplace=True)
     else:
         for i, vec in enumerate(vecset):
-            logging.warning("Appending circuit %s / %s\r", str(i), str(len(vecset) - 1))
+            logging.warning(f"Appending circuit {i + 1} / {len(vecset)}")
             if np.sum(vec) != 0:
                 qc.compose(
                     apply_state_to_index(
@@ -149,7 +151,6 @@ def encode_vectors(  # noqa: PLR0913
                         backend=backend,
                         as_circuit=True,
                     ),
-                    [*qr1, *qr2, *qr3],
                     inplace=True,
                 )
 
@@ -249,7 +250,7 @@ def multi_unit_euclidean(
     qc.h(qr1)
     qc.h(qr2)
     qc.h(qr3)
-    vector_circuit: Gate = encode_vectors(
+    vector_circuit: QuantumCircuit = encode_vectors(
         vecset1,
         m,
         0,
@@ -258,7 +259,7 @@ def multi_unit_euclidean(
         as_circuit=True,
     )
     qc.compose(vector_circuit, [*qr1, *qr2, *qr4], inplace=True)
-    vector_circuit: Gate = encode_vectors(
+    vector_circuit: QuantumCircuit = encode_vectors(
         vecset2,
         n,
         1,
@@ -423,6 +424,57 @@ def retrieve_vectors(
                 retrieved_value: int = results.get(vector_index_string)
                 if retrieved_value is not None:
                     total += retrieved_value
+                else:
+                    retrieved_value: int = results.get(
+                        f"{0:0{len(vector_index_string)}b} {vector_index_string}",
+                    )
+                    if retrieved_value is not None:
+                        total += retrieved_value
+            distance_matrix[i][j] = total
+
+    return distance_matrix
+
+
+def retrieve_from_statevector(
+    set1_size: int,
+    set2_size: int,
+    vector_size: int,
+    vector_qubits: int,
+    statevector: np.ndarray,
+) -> np.ndarray:
+    """
+    Store the results of a quantum circuit dictionary into proper array elements.
+
+    Args:
+    ----
+    set1_size: The number of vectors in the first set
+    set2_size: The number of vectors in the second set
+    vector_size: The size of the vectors within each set
+    vector_qubits: The qybit quantity of the vector data register
+    statevector: The statevector of a quantum circuit
+
+    Returns:
+    -------
+    The resolved vectors in correct indices
+
+    """
+    m: int = ceil(log2(set1_size))
+    if m == 0:
+        m = 1
+    n: int = ceil(log2(set2_size))
+    if n == 0:
+        n = 1
+
+    distance_matrix: np.ndarray = np.zeros((set1_size, set2_size), dtype=np.float64)
+    for i in range(set1_size):
+        for j in range(set2_size):
+            index_string: str = f"{j:0{n}b}"
+            partial_index_string: str = f"{i:0{m}b}"
+            index_string += partial_index_string + "1"
+            total: float = 0
+            for k in range(vector_size):
+                vector_index_string = f"{k:0{vector_qubits}b}" + index_string
+                total += statevector[int(vector_index_string, 2)] ** 2
             distance_matrix[i][j] = total
 
     return distance_matrix
@@ -471,54 +523,72 @@ def multi_euclidean(
     qr2: QuantumRegister = QuantumRegister(m, "i")
     qr3: QuantumRegister = QuantumRegister(n, "j")
     qr4: QuantumRegister = QuantumRegister(vector_qubits, "vec")
-    cr: ClassicalRegister = ClassicalRegister(m + n + vector_qubits + 1)
-    qc: QuantumCircuit = QuantumCircuit(qr1, qr2, qr3, qr4, cr)
+    if not isinstance(backend, StatevectorSimulator):
+        cr: ClassicalRegister = ClassicalRegister(m + n + vector_qubits + 1)
+        qc: QuantumCircuit = QuantumCircuit(qr1, qr2, qr3, qr4, cr)
+    else:
+        qc: QuantumCircuit = QuantumCircuit(qr1, qr2, qr3, qr4)
     qc.compose(
         multi_unit_euclidean(
             vecset1,
             vecset2,
             device_config=device_config,
+            backend=backend,
             as_circuit=True,
         ),
         [*qr1, *qr2, *qr3, *qr4],
         inplace=True,
     )
-    qc.measure([*qr1, *qr2, *qr3, *qr4], cr)
-    logger.warning("Transpiling")
-    if device_config:
-        transpiled_circuit: QuantumCircuit = transpile(
-            qc,
-            backend=backend,
-            optimization_level=0,
-        )
-    else:
-        transpiled_circuit = transpile(qc, backend=backend, optimization_level=0)
+    if not isinstance(backend, StatevectorSimulator):
+        qc.measure([*qr1, *qr2, *qr3, *qr4], cr)
     logger.warning("Executing")
     if device_config:
         result: dict = (
             backend.run(
-                transpiled_circuit,
+                qc,
                 shots=shots,
                 executor=device_config.client,
             )
             .result()
             .get_counts()
         )
+        distances: np.ndarray = (
+            retrieve_vectors(
+                len(vecset1),
+                len(vecset2),
+                vector_size,
+                vector_qubits,
+                result,
+            )
+            * 2 ** (m + n + 2)
+            * norm**2
+        ) / shots
+    elif not isinstance(backend, StatevectorSimulator):
+        result: dict = backend.run(qc, shots=shots).result().get_counts()
+        distances: np.ndarray = (
+            retrieve_vectors(
+                len(vecset1),
+                len(vecset2),
+                vector_size,
+                vector_qubits,
+                result,
+            )
+            * 2 ** (m + n + 2)
+            * norm**2
+        ) / shots
     else:
-        result: dict = (
-            backend.run(transpiled_circuit, shots=shots).result().get_counts()
+        result: np.ndarray = backend.run(qc).result().get_statevector()
+        distances: np.ndarray = (
+            retrieve_from_statevector(
+                len(vecset1),
+                len(vecset2),
+                vector_size,
+                vector_qubits,
+                result,
+            )
+            * 2 ** (m + n + 2)
+            * norm**2
         )
-    distances: np.ndarray = (
-        retrieve_vectors(
-            len(vecset1),
-            len(vecset2),
-            vector_size,
-            vector_qubits,
-            result,
-        )
-        * 2 ** (m + n + 2)
-        * norm**2
-    ) / shots
 
     return distances
 

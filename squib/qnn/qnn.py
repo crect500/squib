@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import logging
+from copy import deepcopy
 from math import ceil, log2
-from typing import TYPE_CHECKING, Iterable
+from typing import TYPE_CHECKING
 
 import numpy as np
 from qiskit import (
@@ -12,63 +14,20 @@ from qiskit import (
     QuantumCircuit,
     QuantumRegister,
 )
-from qiskit_aer import AerSimulator
-from sklearn.metrics import accuracy_score, multilabel_confusion_matrix
+from qiskit_aer import AerSimulator, StatevectorSimulator
 from sklearn.model_selection import KFold
 from sklearn.preprocessing import StandardScaler
 
+from squib.evaluation.metrics import Metrics
 from squib.quclidean import quclidean
 
 if TYPE_CHECKING:
     import pandas as pd
     import polars as pl
+    from qiskit.result import Counts
 
 SHOTS16: int = 2**16
-
-
-class Metrics:
-
-    """
-    Store metrics of a model prediction.
-
-    Attributes
-    ----------
-    confusion_matrix: A matrix containing label predictions vs true values
-    accuracy: The percentage of correct predictions
-
-    """
-
-    __slots__ = ("confusion_matrix", "accuracy")
-
-    def __init__(
-        self: Metrics, truth: Iterable[int], predictions: Iterable[int],
-    ) -> None:
-        """
-        Populate confusion matrix values.
-
-        Args:
-        ----
-        truth: Known labels
-        predictions: Predicted labels
-
-        """
-        self.confusion_matrix = multilabel_confusion_matrix(truth, predictions)
-        self.accuracy: float = accuracy_score(truth, predictions)
-
-    def __repr__(self: Metrics) -> str:
-        """
-        Return all confusion matrix values as one string.
-
-        Return:
-        ------
-        The confusion matrix contents
-
-        """
-        return (
-            f"Accuracy: {self.accuracy}\n"
-            f"Confusion Matrix\n"
-            f"{self.confusion_matrix}"
-        )
+logger: logging.Logger = logging.getLogger(__name__)
 
 
 def preprocess(data: pd.DataFrame) -> pl.DataFrame:
@@ -97,7 +56,7 @@ def _run_qnn_circuit(
     *,
     backend: None | AerSimulator = None,
     shots: int = SHOTS16,
-) -> dict[str, int]:
+) -> Counts | np.ndarray:
     """
     Given a base circuit, runs the qnn circuit for one test feature.
 
@@ -116,9 +75,17 @@ def _run_qnn_circuit(
     """
     if backend is None:
         backend = AerSimulator()
-    qnn_circuit: QuantumCircuit = circuit.compose(feature_circuit)
+    qnn_circuit: QuantumCircuit = circuit.compose(
+        feature_circuit,
+        [*circuit.qregs[0], *circuit.qregs[2], *circuit.qregs[3]],
+    )
     qnn_circuit.h(0)
-    qnn_circuit.measure_all()
+    measurement_bits = ClassicalRegister(qnn_circuit.num_qubits)
+    if isinstance(backend, StatevectorSimulator):
+        return np.real(backend.run(qnn_circuit).result().get_statevector())
+
+    qnn_circuit.add_register(measurement_bits)
+    qnn_circuit.measure_all(add_bits=False)
     return (
         backend.run(
             qnn_circuit,
@@ -149,9 +116,10 @@ def _assign_label(
     The determined label
 
     """
-    k_indices: np.ndarray[int] = np.argpartition(results, -k)[-k:]
+    k_indices: np.ndarray[int] = np.argpartition(results, -k)[:k]
+    logger.warning(labels[k_indices])
     values, counts = np.unique(labels[k_indices], return_counts=True)
-    return values[np.argmax(counts)]
+    return int(values[np.argmax(counts)])
 
 
 def _execute_qnn(  # noqa: PLR0913
@@ -185,6 +153,8 @@ def _execute_qnn(  # noqa: PLR0913
     The determine label for the test feature
 
     """
+    if backend is None:
+        backend = AerSimulator()
     feature_circuit: QuantumCircuit = quclidean.apply_state_to_index(
         0,
         1,
@@ -193,20 +163,32 @@ def _execute_qnn(  # noqa: PLR0913
         backend=backend,
         as_circuit=True,
     )
-    results: dict[str, int] = _run_qnn_circuit(
+    results: dict[str, int] | np.ndarray = _run_qnn_circuit(
         circuit,
         feature_circuit,
         backend=backend,
         shots=shots,
     )
     vector_qubits: int = ceil(log2(len(feature)))
-    distances: np.ndarray = quclidean.retrieve_vectors(
-        training_set_size,
-        1,
-        vector_size,
-        vector_qubits,
-        results,
-    )
+    if vector_qubits == 0:
+        vector_qubits = 1
+    if isinstance(backend, StatevectorSimulator):
+        distances = quclidean.retrieve_from_statevector(
+            training_set_size,
+            1,
+            vector_size,
+            vector_qubits,
+            results,
+        )
+    else:
+        distances: np.ndarray = quclidean.retrieve_vectors(
+            training_set_size,
+            1,
+            vector_size,
+            vector_qubits,
+            results,
+        )
+
     return _assign_label(distances[:, 0], labels, k=k)
 
 
@@ -239,47 +221,63 @@ def run_qnn(  # noqa: PLR0913
     """
     if backend is None:
         backend = AerSimulator()
+    working_labels: np.ndarray = deepcopy(labels)
     total_samples: int = len(training_set) + len(test_set)
     address_register_size: int = ceil(log2(total_samples))
-    normalized_train_set, normalized_test_set, norm = quclidean.build_unit_vectors(
+    normalized_train_set, normalized_test_set, _ = quclidean.build_unit_vectors(
         training_set,
         test_set,
     )
     vector_size: int = training_set.shape[1]
     data_register_size: int = ceil(log2(normalized_train_set.shape[1]))
+    if data_register_size == 0:
+        data_register_size = 1
 
-    ancillary_register: AncillaRegister = AncillaRegister(1, "a")
-    train_address_register: QuantumRegister = QuantumRegister(
+    ancillary_register = AncillaRegister(1, "a")
+    train_address_register = QuantumRegister(
         address_register_size,
         "i",
     )
-    test_address_register: QuantumRegister = QuantumRegister(1, "j")
-    data_register: QuantumRegister = QuantumRegister(data_register_size, "vec")
-    cr: ClassicalRegister = ClassicalRegister(
-        address_register_size + data_register_size + 2,
-    )
-    base_circuit: QuantumCircuit = QuantumCircuit(
-        ancillary_register,
-        train_address_register,
-        test_address_register,
-        data_register,
-        cr,
-    )
+    test_address_register = QuantumRegister(1, "j")
+    data_register = QuantumRegister(data_register_size, "vec")
+    if not isinstance(backend, StatevectorSimulator):
+        cr = ClassicalRegister(
+            address_register_size + data_register_size + 2,
+        )
+        base_circuit = QuantumCircuit(
+            ancillary_register,
+            train_address_register,
+            test_address_register,
+            data_register,
+            cr,
+        )
+    else:
+        base_circuit = QuantumCircuit(
+            ancillary_register,
+            train_address_register,
+            test_address_register,
+            data_register,
+        )
     base_circuit.h(ancillary_register)
+    base_circuit.h(train_address_register)
     base_circuit.compose(
         quclidean.encode_vectors(
             normalized_train_set,
             address_register_size,
             control_state=0,
+            backend=backend,
             as_circuit=True,
         ),
+        [*ancillary_register, *train_address_register, *data_register],
         inplace=True,
     )
-    for test_feature in normalized_test_set:
+    new_labels: np.ndarray = np.ndarray((len(normalized_test_set),), dtype=int)
+    for iteration, test_feature in enumerate(normalized_test_set):
+        logger.warning(f"Building circuit {iteration} / {len(normalized_test_set)}")
         new_label: int = _execute_qnn(
             base_circuit,
             test_feature,
-            labels,
+            working_labels,
             len(normalized_train_set),
             vector_size,
             k=k,
@@ -291,7 +289,8 @@ def run_qnn(  # noqa: PLR0913
             np.expand_dims(test_feature, 0),
             axis=0,
         )
-        labels = np.append(labels, new_label, axis=0)
+        new_labels[iteration] = new_label
+        working_labels = np.append(working_labels, new_label)
         if ceil(log2(len(normalized_train_set))) <= address_register_size:
             base_circuit.compose(
                 quclidean.apply_state_to_index(
@@ -302,8 +301,10 @@ def run_qnn(  # noqa: PLR0913
                     backend=backend,
                     as_circuit=True,
                 ),
+                [*ancillary_register, *train_address_register, *data_register],
+                inplace=True,
             )
-    return labels
+    return new_labels
 
 
 def cross_validate(
@@ -312,7 +313,7 @@ def cross_validate(
     *,
     k: int = 3,
     backend: AerSimulator | None = None,
-    shots: int = 2**15,
+    shots: int = SHOTS16,
 ) -> list[Metrics]:
     """
     Run k-nearest neighbors as a quantum algorithm with Euclidean distance.
@@ -330,7 +331,11 @@ def cross_validate(
         backend: AerSimulator = AerSimulator()
     index_generator: KFold = KFold(shuffle=True)
     metrics: list[Metrics] = []
-    for train_index, test_index in index_generator.split(features):
+    for iteration, (train_index, test_index) in enumerate(
+        index_generator.split(features),
+        start=1,
+    ):
+        logger.warning(f"Training fold {iteration} / 5")
         new_labels: np.ndarray = run_qnn(
             features[train_index],
             features[test_index],
@@ -339,6 +344,9 @@ def cross_validate(
             backend=backend,
             shots=shots,
         )
+        logger.warning(f"Truth {labels[test_index]}")
+        logger.warning(f"Predictions {new_labels}")
         metrics.append(Metrics(truth=labels[test_index], predictions=new_labels))
+        logger.warning(metrics[-1])
 
     return metrics

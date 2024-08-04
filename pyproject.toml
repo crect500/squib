@@ -8,6 +8,9 @@ lint.extend-ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
+"squib/*" = [
+    "G004",     # Allow f-strings in log statements
+]
 "tests/*" = [
     "INP001",   # Do not use an __init__.py for unit test directory
     "D100",     # Do not use module docstring in unit test files

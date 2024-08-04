@@ -1,16 +1,20 @@
 from __future__ import annotations
 
-from math import ceil
+from math import ceil, log2
 from typing import TYPE_CHECKING
 from unittest import mock
 
 import numpy as np
 import pandas as pd
+import pytest
 from hypothesis import given, settings
 from hypothesis.strategies import integers
-from qiskit import QuantumCircuit
+from qiskit import AncillaRegister, QuantumCircuit, QuantumRegister
+from qiskit.result import Counts
+from qiskit_aer import StatevectorSimulator
 
 from squib.qnn import qnn
+from squib.quclidean import quclidean
 from tests.conftest import generate_euclidean_circuit_results
 
 if TYPE_CHECKING:
@@ -25,26 +29,78 @@ def test_preprocess(rows: int, columns: int) -> None:
     assert data.shape == scaled_data.shape
 
 
-@mock.patch("qiskit.result.Result.get_counts")
-@given(
-    integers(min_value=1, max_value=50),
-    integers(min_value=1, max_value=50),
-    integers(min_value=1, max_value=7),
-)
-@settings(deadline=300)
+@given(integers(min_value=1, max_value=3), integers(min_value=1, max_value=3))
+@settings(deadline=500, max_examples=5)
 def test_run_qnn_circuit(
-    mock_counts: mock.Mock,
-    vecset1_size: int,
-    vecset2_size: int,
-    vector_size: int,
+    vecset1_qubits: int,
+    vector_qubits: int,
 ) -> None:
-    circuit: QuantumCircuit = QuantumCircuit(1)
-    feature_circuit: QuantumCircuit = QuantumCircuit(1)
-    result_array: np.ndarray = np.ndarray((vecset1_size, vecset2_size, vector_size))
-    results_dict: dict[str, int] = generate_euclidean_circuit_results(result_array)
-    mock_counts.return_value = results_dict
-    solution: dict[str, int] = qnn._run_qnn_circuit(circuit, feature_circuit)
-    assert results_dict == solution
+    backend = StatevectorSimulator()
+    random_generator: np.random.Generator = np.random.default_rng()
+    vecset1_size: int = int(2**vecset1_qubits)
+    vector_size: int = int(2**vector_qubits)
+    vecset1: np.ndarray = random_generator.uniform(size=(vecset1_size, vector_size))
+    for index, vector in enumerate(vecset1):
+        vecset1[index] = vector / np.linalg.norm(vector)
+    test_feature: np.ndarray = random_generator.uniform(size=vector_size)
+    test_feature = test_feature / np.linalg.norm(test_feature)
+    address_register_size: int = ceil(log2(vecset1_size))
+    data_register_size: int = ceil(log2(vector_size))
+    if address_register_size == 0:
+        address_register_size = 1
+    if data_register_size == 0:
+        data_register_size = 1
+
+    ancillary_register = AncillaRegister(1, "a")
+    training_register = QuantumRegister(address_register_size, "i")
+    test_register = QuantumRegister(1, "j")
+    data_register = QuantumRegister(data_register_size, "vec")
+    circuit = QuantumCircuit(
+        ancillary_register,
+        training_register,
+        test_register,
+        data_register,
+    )
+    circuit.h(ancillary_register)
+    circuit.h(training_register)
+    circuit.compose(
+        quclidean.encode_vectors(
+            vecset1,
+            address_register_size,
+            0,
+            backend=backend,
+            as_circuit=True,
+        ),
+        [*ancillary_register, *training_register, *data_register],
+        inplace=True,
+    )
+    feature_circuit: QuantumCircuit = quclidean.apply_state_to_index(
+        0,
+        1,
+        1,
+        test_feature,
+        backend=backend,
+        as_circuit=True,
+    )
+    solution: Counts = qnn._run_qnn_circuit(circuit, feature_circuit)
+    assert isinstance(solution, Counts)
+    statevector_solution: np.ndarray = qnn._run_qnn_circuit(
+        circuit,
+        feature_circuit,
+        backend=StatevectorSimulator(),
+    )
+    distances: np.ndarray = quclidean.retrieve_from_statevector(
+        vecset1_size,
+        1,
+        vector_size,
+        data_register_size,
+        statevector_solution,
+    )
+    for distance, vector in zip(distances[0], vecset1):
+        classical_distance: float = np.sum((vector - test_feature) ** 2) / 2 ** (
+            address_register_size + 2
+        )
+        assert classical_distance == pytest.approx(distance, abs=1e-4)
 
 
 @given(integers(min_value=7, max_value=50))
@@ -128,7 +184,8 @@ def test_cross_validate(
     fold_quantity: int = 5
     random_generator: np.random.Generator = np.random.default_rng()
     fake_labels: np.ndarray = random_generator.choice(
-        [0, 1], size=ceil(feature_quantity / fold_quantity),
+        [0, 1],
+        size=ceil(feature_quantity / fold_quantity),
     )
     mock_run.return_value = fake_labels
     mock_confusion.return_value = random_generator.integers(0, 1, size=(2, 2))

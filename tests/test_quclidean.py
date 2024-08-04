@@ -7,8 +7,8 @@ import pytest
 from dask.distributed import Client, LocalCluster
 from hypothesis import given, settings
 from hypothesis.strategies import integers
-from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister
-from qiskit_aer import AerSimulator
+from qiskit import QuantumCircuit, QuantumRegister
+from qiskit_aer import StatevectorSimulator
 
 from squib.acceleration.device_setup import DaskConfig
 from squib.quclidean import quclidean
@@ -20,13 +20,12 @@ SHOTS18: int = 262144
 
 
 @given(integers(min_value=0, max_value=8), integers(min_value=1, max_value=3))
-@settings(deadline=500, max_examples=5)
+@settings(deadline=1000, max_examples=10)
 def test_apply_state_to_index(index: int, vector_qubit_quantity: int) -> None:
     random_generator: np.random.Generator = np.random.default_rng()
     state: np.ndarray = random_generator.normal(size=2**vector_qubit_quantity)
     state = state / np.linalg.norm(state)
-    backend: AerSimulator = AerSimulator()
-    shots: int = SHOTS13
+    backend = StatevectorSimulator()
     vector_qubit_quantity: int = int(log2(len(state)))
     if index == 0:
         n: int = 1
@@ -35,34 +34,33 @@ def test_apply_state_to_index(index: int, vector_qubit_quantity: int) -> None:
     qr1: QuantumRegister = QuantumRegister(1, "a")
     qr2: QuantumRegister = QuantumRegister(n, "j")
     qr3: QuantumRegister = QuantumRegister(vector_qubit_quantity, "vec")
-    cr: ClassicalRegister = ClassicalRegister(vector_qubit_quantity + n + 1, "p")
-    qc: QuantumCircuit = QuantumCircuit(qr1, qr2, qr3, cr)
+    qc: QuantumCircuit = QuantumCircuit(qr1, qr2, qr3)
     qc.h(qr1)
     qc.h(qr2)
     qc.compose(
-        quclidean.apply_state_to_index(index, n, 1, state, as_circuit=True),
-        [*qr1, *qr2, *qr3],
+        quclidean.apply_state_to_index(
+            index,
+            n,
+            1,
+            state,
+            backend=backend,
+            as_circuit=True,
+        ),
         inplace=True,
     )
-    qc.measure([*qr1, *qr2, *qr3], cr)
-    result: dict = backend.run(qc, shots=shots).result().get_counts()
+    result: np.ndarray = np.real(backend.run(qc).result().get_statevector()) * sqrt(
+        2 ** (n + 1),
+    )
     for count, element in enumerate(state):
         address_string: str = f"{index:0{n}b}"
         index_string: str = f"{count:0{vector_qubit_quantity}b}"
         index_string += address_string + "1"
-        retrieved_value: int = result.get(index_string)
-        if retrieved_value is not None:
-            assert sqrt(2 ** (n + 1) * retrieved_value / shots) == pytest.approx(
-                abs(element),
-                rel=1e-2,
-                abs=1e-1,
-            )
-        else:
-            assert element == pytest.approx(0, abs=1e-1)
+        value: float = result[int(index_string, 2)]
+        assert value == pytest.approx(element, abs=1e-7)
 
 
-@given(integers(min_value=1, max_value=8), integers(min_value=1, max_value=3))
-@settings(deadline=5000, max_examples=5)
+@given(integers(min_value=1, max_value=8), integers(min_value=1, max_value=2))
+@settings(deadline=5000, max_examples=10)
 def test_encode_vectors(vector_quantity: int, vector_qubits: int) -> None:
     random_generator: np.random.Generator = np.random.default_rng()
     vecset: np.ndarray = random_generator.normal(
@@ -70,43 +68,34 @@ def test_encode_vectors(vector_quantity: int, vector_qubits: int) -> None:
     )
     for index, vector in enumerate(vecset):
         vecset[index] = vector / np.linalg.norm(vector)
-    backend: AerSimulator = AerSimulator()
-    shots: int = SHOTS13
+    backend = StatevectorSimulator()
     n: int = ceil(log2(len(vecset)))
     if n == 0:
         n = 1
     q: int = int(log2(len(vecset[0])))
-    qr1: QuantumRegister = QuantumRegister(1)
-    qr2: QuantumRegister = QuantumRegister(n)
-    qr3: QuantumRegister = QuantumRegister(q)
-    cr: ClassicalRegister = ClassicalRegister(n + q + 1)
-    qc: QuantumCircuit = QuantumCircuit(qr1, qr2, qr3, cr)
+    qr1: QuantumRegister = QuantumRegister(1, "a")
+    qr2: QuantumRegister = QuantumRegister(n, "j")
+    qr3: QuantumRegister = QuantumRegister(q, "vec")
+    qc: QuantumCircuit = QuantumCircuit(qr1, qr2, qr3)
     qc.h(qr1)
     qc.h(qr2)
     qc.compose(
-        quclidean.encode_vectors(vecset, n, 1, as_circuit=True),
-        [*qr1, *qr2, *qr3],
+        quclidean.encode_vectors(vecset, n, 1, backend=backend, as_circuit=True),
         inplace=True,
     )
-    qc.measure([*qr1, *qr2, *qr3], cr)
-    result: dict = backend.run(qc, shots=shots).result().get_counts()
+    result: np.ndarray = np.real(backend.run(qc).result().get_statevector())
     for i, vec in enumerate(vecset):
         for j, element in enumerate(vec):
             address_string: str = f"{i:0{n}b}"
             index_string: str = f"{j:0{q}b}"
             index_string += address_string + "1"
-            retrieved_value: int = result.get(index_string)
-            if retrieved_value is not None:
-                assert sqrt(
-                    2 ** (n + 1) * retrieved_value / shots,
-                ) == pytest.approx(abs(element), rel=1e-2, abs=1e-1)
-            else:
-                assert element == pytest.approx(0, abs=1e-1)
+            value: float = sqrt(2 ** (n + 1)) * result[int(index_string, 2)]
+            assert value == pytest.approx(element, abs=1e-7)
 
 
 @given(
-    integers(min_value=1, max_value=2),
-    integers(min_value=1, max_value=4),
+    integers(min_value=1, max_value=8),
+    integers(min_value=1, max_value=8),
     integers(min_value=1, max_value=3),
 )
 @settings(deadline=10000, max_examples=5)
@@ -122,8 +111,7 @@ def test_multi_unit_euclidean(
         vecset1[index] = vector / np.linalg.norm(vector)
     for index, vector in enumerate(vecset2):
         vecset2[index] = vector / np.linalg.norm(vector)
-    backend: AerSimulator = AerSimulator()
-    shots: int = SHOTS16
+    backend = StatevectorSimulator()
     m: int = ceil(log2(vecset1_size))
     if m == 0:
         m = 1
@@ -134,33 +122,30 @@ def test_multi_unit_euclidean(
     qr2: QuantumRegister = QuantumRegister(m, "i")
     qr3: QuantumRegister = QuantumRegister(n, "j")
     qr4: QuantumRegister = QuantumRegister(vector_qubits, "vec")
-    cr: ClassicalRegister = ClassicalRegister(m + n + vector_qubits + 1)
-    qc: QuantumCircuit = QuantumCircuit(qr1, qr2, qr3, qr4, cr)
+    qc: QuantumCircuit = QuantumCircuit(qr1, qr2, qr3, qr4)
     qc.compose(
-        quclidean.multi_unit_euclidean(vecset1, vecset2, as_circuit=True),
-        [*qr1, *qr2, *qr3, *qr4],
+        quclidean.multi_unit_euclidean(
+            vecset1,
+            vecset2,
+            backend=backend,
+            as_circuit=True,
+        ),
         inplace=True,
     )
-    qc.measure([*qr1, *qr2, *qr3, *qr4], cr)
-    result: dict = backend.run(qc, shots=shots).result().get_counts()
+    result: np.array = np.real(backend.run(qc).result().get_statevector()) * sqrt(
+        2 ** (m + n + 2),
+    )
     for i, vec1 in enumerate(vecset1):
         for j, vec2 in enumerate(vecset2):
-            solution_vec: np.ndarray = (np.asarray(vec1) - np.asarray(vec2)) ** 2
+            solution_vec: np.ndarray = np.asarray(vec1) - np.asarray(vec2)
             for k, solution in enumerate(solution_vec):
                 index_string: str = f"{k:0{vector_qubits}b}"
-                index_string = (
-                    "0" * (vector_qubits - len(index_string))
-                ) + index_string
                 partial_index_string: str = f"{j:0{n}b}"
                 index_string += partial_index_string
                 partial_index_string: str = f"{i:0{m}b}"
                 index_string += partial_index_string + "1"
-                retrieved_value: int = result.get(index_string)
-                if retrieved_value is not None:
-                    value: float = (2 ** (m + n + 2) * retrieved_value) / shots
-                    assert value == pytest.approx(solution, rel=1e-2, abs=1e-1)
-                else:
-                    assert solution == pytest.approx(0, abs=1e-1)
+                value: float = result[int(index_string, 2)]
+                assert value == pytest.approx(solution, abs=1e-4)
 
 
 @given(integers(min_value=1, max_value=10), integers(min_value=1, max_value=15))
@@ -249,11 +234,11 @@ def test_retrieve_vectors(
 
 
 @given(
-    integers(min_value=1, max_value=5),
-    integers(min_value=1, max_value=5),
+    integers(min_value=1, max_value=8),
+    integers(min_value=1, max_value=8),
     integers(min_value=1, max_value=3),
 )
-@settings(deadline=15000)
+@settings(deadline=15000, max_examples=5)
 def test_multi_euclidean(
     vecset1_size: int,
     vecset2_size: int,
@@ -271,14 +256,12 @@ def test_multi_euclidean(
         for j, vec2 in enumerate(vecset2):
             difference: np.ndarray = vec1 - vec2
             solution: float = float(np.dot(difference, difference))
-            if solution == 0:
-                assert test_solution[i][j] == pytest.approx(0, abs=1e-1)
-            else:
-                assert test_solution[i][j] == pytest.approx(
-                    solution,
-                    rel=2e-1,
-                    abs=2e-1,
-                )
+            value: float = test_solution[i][j]
+            assert value == pytest.approx(
+                solution,
+                rel=1e-1,
+                abs=1e-2,
+            )
 
 
 @pytest.mark.parametrize(
