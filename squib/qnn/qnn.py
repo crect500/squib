@@ -101,7 +101,7 @@ def _assign_label(
     labels: np.ndarray,
     *,
     k: int = 3,
-) -> int:
+) -> tuple[int, np.ndarray[int]]:
     """
     Assign result to label based on k-nearest neighbors.
 
@@ -117,9 +117,10 @@ def _assign_label(
 
     """
     k_indices: np.ndarray[int] = np.argpartition(results, -k)[:k]
-    logger.warning(labels[k_indices])
-    values, counts = np.unique(labels[k_indices], return_counts=True)
-    return int(values[np.argmax(counts)])
+    k_greatest: np.ndarray[int] = labels[k_indices]
+    logger.warning(k_greatest)
+    values, counts = np.unique(k_greatest, return_counts=True)
+    return int(values[np.argmax(counts)]), k_greatest
 
 
 def _execute_qnn(  # noqa: PLR0913
@@ -132,7 +133,7 @@ def _execute_qnn(  # noqa: PLR0913
     k: int = 3,
     backend: None | AerSimulator = None,
     shots: int = SHOTS16,
-) -> int:
+) -> tuple[int, np.ndarray[int]]:
     """
     Create and execute a quantum circuit to determine test feature k-nearest neighbor.
 
@@ -200,7 +201,7 @@ def run_qnn(  # noqa: PLR0913
     k: int = 3,
     backend: None | AerSimulator = None,
     shots: int = SHOTS16,
-) -> np.ndarray:
+) -> tuple[np.ndarray[int], np.ndarray[int], np.ndarray[int]]:
     """
     Label each test feature using quantum circuit implementations of the knn algorithm.
 
@@ -216,7 +217,7 @@ def run_qnn(  # noqa: PLR0913
 
     Returns:
     -------
-    The labels for the test features
+    The labels for the test features and the sorted q- and k-nearest neighbors
 
     """
     if backend is None:
@@ -272,9 +273,15 @@ def run_qnn(  # noqa: PLR0913
         inplace=True,
     )
     new_labels: np.ndarray = np.ndarray((len(normalized_test_set),), dtype=int)
+    q_nearest_neighbors: np.ndarray[int] = np.ndarray(
+        (len(normalized_test_set), k), dtype=int,
+    )
+    k_nearest_neighbors: np.ndarray[int] = np.ndarray(
+        (len(normalized_test_set), k), dtype=int,
+    )
     for iteration, test_feature in enumerate(normalized_test_set):
         logger.warning(f"Building circuit {iteration} / {len(normalized_test_set)}")
-        new_label: int = _execute_qnn(
+        new_label, q_greatest = _execute_qnn(
             base_circuit,
             test_feature,
             working_labels,
@@ -284,12 +291,21 @@ def run_qnn(  # noqa: PLR0913
             backend=backend,
             shots=shots,
         )
+        new_labels[iteration] = new_label
+        q_nearest_neighbors[iteration] = q_greatest
+        elementwise_difference: np.ndarray[float] = np.subtract(
+            normalized_train_set, test_feature,
+        )
         normalized_train_set = np.append(
             normalized_train_set,
             np.expand_dims(test_feature, 0),
             axis=0,
         )
-        new_labels[iteration] = new_label
+        k_nearest_neighbors[iteration] = _assign_label(
+            np.sum(elementwise_difference * elementwise_difference, axis=1),
+            labels=working_labels,
+            k=k,
+        )[1]
         working_labels = np.append(working_labels, new_label)
         if ceil(log2(len(normalized_train_set))) <= address_register_size:
             base_circuit.compose(
@@ -304,7 +320,7 @@ def run_qnn(  # noqa: PLR0913
                 [*ancillary_register, *train_address_register, *data_register],
                 inplace=True,
             )
-    return new_labels
+    return new_labels, q_nearest_neighbors, k_nearest_neighbors
 
 
 def cross_validate(
@@ -336,7 +352,7 @@ def cross_validate(
         start=1,
     ):
         logger.warning(f"Training fold {iteration} / 5")
-        new_labels: np.ndarray = run_qnn(
+        new_labels, q_nearest_neighbors, k_nearest_neighbors = run_qnn(
             features[train_index],
             features[test_index],
             labels[train_index],
@@ -346,7 +362,14 @@ def cross_validate(
         )
         logger.warning(f"Truth {labels[test_index]}")
         logger.warning(f"Predictions {new_labels}")
-        metrics.append(Metrics(truth=labels[test_index], predictions=new_labels))
+        metrics.append(
+            Metrics(
+                truth=labels[test_index],
+                predictions=new_labels,
+                quantum_neighbors=q_nearest_neighbors,
+                classical_neighbors=k_nearest_neighbors,
+            ),
+        )
         logger.warning(metrics[-1])
 
     return metrics

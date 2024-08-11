@@ -8,6 +8,7 @@ import numpy as np
 
 
 class Metrics:
+
     """
     Store metrics of a model prediction.
 
@@ -24,12 +25,17 @@ class Metrics:
         "false_negative",
         "true_negative",
         "accuracy",
+        "jaccard",
+        "average_jaccard",
     )
 
     def __init__(
         self: Metrics,
         truth: Iterable[int],
         predictions: Iterable[int],
+        *,
+        quantum_neighbors: np.ndarray[int] | None = None,
+        classical_neighbors: np.ndarray[int] | None = None,
     ) -> None:
         """
         Populate confusion matrix values.
@@ -42,6 +48,12 @@ class Metrics:
         """
         self._populate_confusion_matrix(predictions, truth)
         self._calculate_accuracy()
+        if isinstance(quantum_neighbors, np.ndarray):
+            self._calculate_jaccard(quantum_neighbors, classical_neighbors)
+            self._calculate_average_jaccard(quantum_neighbors, classical_neighbors)
+        else:
+            self.jaccard = None
+            self.average_jaccard = None
 
     def __repr__(self: Metrics) -> str:
         """
@@ -52,8 +64,19 @@ class Metrics:
         The confusion matrix contents
 
         """
+        if not self.jaccard:
+            return (
+                f"Accuracy: {self.accuracy}\n"
+                f"True Positives: {self.true_positive}\n"
+                f"False Positives: {self.false_positive}\n"
+                f"False Negatives: {self.false_negative}\n"
+                f"True Negatives: {self.true_negative}"
+            )
+
         return (
             f"Accuracy: {self.accuracy}\n"
+            f"Jaccard: {self.jaccard}\n"
+            f"Average Jaccard: {self.average_jaccard}\n"
             f"True Positives: {self.true_positive}\n"
             f"False Positives: {self.false_positive}\n"
             f"False Negatives: {self.false_negative}\n"
@@ -92,3 +115,40 @@ class Metrics:
             self.accuracy = trues / (trues + self.false_positive + self.false_negative)
         except ZeroDivisionError:
             self.accuracy = 0
+
+    def _calculate_jaccard(
+        self: Metrics,
+        quantum_neighbors: np.ndarray[int],
+        classical_neighbors: np.ndarray[int],
+    ):
+        total: float = 0
+        for quantum_result, classical_result in zip(
+            quantum_neighbors, classical_neighbors,
+        ):
+            jaccard_index: float = np.sum(quantum_result == classical_result) / len(
+                classical_result,
+            )
+            total += jaccard_index
+
+        self.jaccard = total / len(classical_neighbors)
+
+    def _calculate_average_jaccard(
+        self: Metrics,
+        quantum_neighbors: np.ndarray[int],
+        classical_neighbors: np.ndarray[int],
+    ):
+        total: float = 0
+        for k in range(1, quantum_neighbors.shape[1] + 1):
+            subtotal: float = 0
+            for quantum_slice, classical_slice in zip(
+                quantum_neighbors[:, :k], classical_neighbors[:, :k],
+            ):
+                jaccard_index: float = np.sum(quantum_slice == classical_slice) / len(
+                    classical_slice,
+                )
+                subtotal += jaccard_index
+            total += subtotal
+
+        self.average_jaccard = total / (
+            classical_neighbors.shape[0] * classical_neighbors.shape[1]
+        )

@@ -184,9 +184,7 @@ def ecoli(output_directory: Path = None) -> None:
     targets.loc[targets["class"] == "pp"] = 7
     targets = np.squeeze(targets.to_numpy(int), axis=1)
     indices = np.where(targets <= 1)
-    processed_features: np.ndarray = qnn.preprocess(
-        features[indices[0]]
-    )
+    processed_features: np.ndarray = qnn.preprocess(features[indices[0]])
     targets = targets[indices]
     classical_metrics: list[Metrics] = cross_validate_knn(processed_features, targets)
     metrics: list[Metrics] = qnn.cross_validate(processed_features, targets)
@@ -206,9 +204,7 @@ def glass(output_directory: Path = None) -> None:
     targets[targets == 0] = 8
     targets[targets == 2] = 1
     indices = np.where(targets <= 1)
-    processed_features: np.ndarray = qnn.preprocess(
-        features[indices]
-    )
+    processed_features: np.ndarray = qnn.preprocess(features[indices])
     classical_metrics: list[Metrics] = cross_validate_knn(processed_features, targets)
     metrics: list[Metrics] = qnn.cross_validate(processed_features, targets)
 

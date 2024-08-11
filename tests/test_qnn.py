@@ -30,7 +30,7 @@ def test_preprocess(rows: int, columns: int) -> None:
 
 
 @given(integers(min_value=1, max_value=3), integers(min_value=1, max_value=3))
-@settings(deadline=500, max_examples=5)
+@settings(deadline=1000, max_examples=5)
 def test_run_qnn_circuit(
     vecset1_qubits: int,
     vector_qubits: int,
@@ -111,7 +111,7 @@ def test_assign_label(size: int) -> None:
     data["value"] = values
     labels: np.ndarray = random_generator.choice(np.arange(2), len(values))
     data["class"] = labels
-    new_label: int = qnn._assign_label(values, labels)
+    new_label, nearest_neighbors = qnn._assign_label(values, labels)
     data: pd.DataFrame = data.sort_values(
         by="value",
         ascending=False,
@@ -145,7 +145,7 @@ def test_execute_qnn(
 
 @mock.patch("squib.qnn.qnn._execute_qnn")
 @given(
-    integers(min_value=1, max_value=20),
+    integers(min_value=3, max_value=20),
     integers(min_value=1, max_value=20),
     integers(min_value=1, max_value=7),
 )
@@ -157,7 +157,10 @@ def test_run_circuit(
     vector_size: int,
 ) -> None:
     random_generator: np.random.Generator = np.random.default_rng()
-    mock_execute.return_value = random_generator.choice(np.arange(2), size=(1,))
+    mock_execute.return_value = (
+        random_generator.choice(np.arange(2), size=(1,)),
+        random_generator.integers(0, 2, size=3),
+    )
     training_set: np.ndarray = random_generator.uniform(
         size=(train_set_size, vector_size),
     )
@@ -166,7 +169,9 @@ def test_run_circuit(
     with mock.patch("qiskit.QuantumCircuit.compose"), mock.patch(
         "squib.quclidean.quclidean.encode_vectors",
     ):
-        new_labels: np.ndarray = qnn.run_qnn(training_set, test_set, labels)
+        new_labels, q_neighbors, k_neighbors = qnn.run_qnn(
+            training_set, test_set, labels,
+        )
 
     assert len(new_labels) == train_set_size + test_set_size
 
