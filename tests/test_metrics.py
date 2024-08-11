@@ -13,10 +13,14 @@ from squib.evaluation.metrics import Metrics
 def test_jaccard(k: int, feature_quantity: int) -> None:
     random_generator: np.random.Generator = np.random.default_rng()
     q_neighbors: np.ndarray[int] = random_generator.integers(
-        0, 2, (feature_quantity, k),
+        0,
+        2,
+        (feature_quantity, k),
     )
     k_neighbors: np.ndarray[int] = random_generator.integers(
-        0, 2, (feature_quantity, k),
+        0,
+        2,
+        (feature_quantity, k),
     )
     jaccard: float = 0
     for q_result, k_result in zip(q_neighbors, k_neighbors):
@@ -39,10 +43,14 @@ def test_jaccard(k: int, feature_quantity: int) -> None:
 def test_average_jaccard(k: int, feature_quantity: int) -> None:
     random_generator: np.random.Generator = np.random.default_rng()
     q_neighbors: np.ndarray[int] = random_generator.integers(
-        0, 2, (feature_quantity, k),
+        0,
+        2,
+        (feature_quantity, k),
     )
     k_neighbors: np.ndarray[int] = random_generator.integers(
-        0, 2, (feature_quantity, k),
+        0,
+        2,
+        (feature_quantity, k),
     )
     average_jaccard: float = 0
     for m in range(1, k + 1):

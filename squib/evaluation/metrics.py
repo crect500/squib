@@ -8,7 +8,6 @@ import numpy as np
 
 
 class Metrics:
-
     """
     Store metrics of a model prediction.
 
@@ -123,7 +122,8 @@ class Metrics:
     ):
         total: float = 0
         for quantum_result, classical_result in zip(
-            quantum_neighbors, classical_neighbors,
+            quantum_neighbors,
+            classical_neighbors,
         ):
             jaccard_index: float = np.sum(quantum_result == classical_result) / len(
                 classical_result,
@@ -141,7 +141,8 @@ class Metrics:
         for k in range(1, quantum_neighbors.shape[1] + 1):
             subtotal: float = 0
             for quantum_slice, classical_slice in zip(
-                quantum_neighbors[:, :k], classical_neighbors[:, :k],
+                quantum_neighbors[:, :k],
+                classical_neighbors[:, :k],
             ):
                 jaccard_index: float = np.sum(quantum_slice == classical_slice) / len(
                     classical_slice,

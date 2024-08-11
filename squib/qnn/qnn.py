@@ -274,10 +274,12 @@ def run_qnn(  # noqa: PLR0913
     )
     new_labels: np.ndarray = np.ndarray((len(normalized_test_set),), dtype=int)
     q_nearest_neighbors: np.ndarray[int] = np.ndarray(
-        (len(normalized_test_set), k), dtype=int,
+        (len(normalized_test_set), k),
+        dtype=int,
     )
     k_nearest_neighbors: np.ndarray[int] = np.ndarray(
-        (len(normalized_test_set), k), dtype=int,
+        (len(normalized_test_set), k),
+        dtype=int,
     )
     for iteration, test_feature in enumerate(normalized_test_set):
         logger.warning(f"Building circuit {iteration} / {len(normalized_test_set)}")
@@ -294,7 +296,8 @@ def run_qnn(  # noqa: PLR0913
         new_labels[iteration] = new_label
         q_nearest_neighbors[iteration] = q_greatest
         elementwise_difference: np.ndarray[float] = np.subtract(
-            normalized_train_set, test_feature,
+            normalized_train_set,
+            test_feature,
         )
         normalized_train_set = np.append(
             normalized_train_set,

@@ -16,7 +16,9 @@ if TYPE_CHECKING:
 logger: logging.Logger = logging.getLogger(__name__)
 
 
-def cross_validate_knn(features: np.ndarray, labels: np.ndarray) -> list[Metrics]:
+def cross_validate_knn(
+    features: np.ndarray, labels: np.ndarray, *, k: int = 3
+) -> list[Metrics]:
     """
     Run classical k-nearest neighbors.
 
@@ -36,7 +38,7 @@ def cross_validate_knn(features: np.ndarray, labels: np.ndarray) -> list[Metrics
         index_generator.split(features),
     ):
         logger.warning(f"Training fold {iteration + 1} / 5")
-        neigbhors = KNeighborsClassifier(3)
+        neigbhors = KNeighborsClassifier(k)
         neigbhors.fit(features[train_index], labels[train_index])
         new_labels: np.ndarray = neigbhors.predict(features[test_index])
         metrics.append(Metrics(truth=labels[test_index], predictions=new_labels))

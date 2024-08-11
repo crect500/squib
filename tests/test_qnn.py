@@ -170,7 +170,9 @@ def test_run_circuit(
         "squib.quclidean.quclidean.encode_vectors",
     ):
         new_labels, q_neighbors, k_neighbors = qnn.run_qnn(
-            training_set, test_set, labels,
+            training_set,
+            test_set,
+            labels,
         )
 
     assert len(new_labels) == train_set_size + test_set_size

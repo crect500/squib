@@ -1,18 +1,18 @@
 from __future__ import annotations
 
-from argparse import ArgumentParser
 import logging
+from argparse import ArgumentParser
 from pathlib import Path
 from sys import modules
 from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
+from qiskit_aer import AerSimulator, StatevectorSimulator
 from ucimlrepo import fetch_ucirepo
-from qiskit_aer import StatevectorSimulator
 
-from squib.qnn import qnn
 from squib.evaluation.knn import cross_validate_knn
+from squib.qnn import qnn
 
 if TYPE_CHECKING:
     from argparse import Namespace
@@ -55,6 +55,25 @@ def parse_script_args() -> Namespace:
         help="The directory in which to save the output log",
     )
 
+    parser.add_argument(
+        "-k",
+        dest="k",
+        type=int,
+        required=False,
+        default=3,
+        help="The number of nearest neigbhors to check",
+    )
+
+    parser.add_argument(
+        "-b",
+        "--backend",
+        dest="backend",
+        type=str,
+        required=False,
+        default="statevectorsimulator",
+        help="The quantum or simulated backend on which to run the experiment",
+    )
+
     return parser.parse_args()
 
 
@@ -74,8 +93,9 @@ def save_results(
     file_descriptor.write("\n")
 
 
-def iris(output_directory: Path = None) -> None:
-    backend = StatevectorSimulator()
+def iris(output_directory: Path = None, *, k: int = 3, backend=None) -> None:
+    if not backend:
+        backend = StatevectorSimulator()
     if not output_directory:
         output_directory = Path()
     transfusion_data: pd.DataFrame = fetch_ucirepo(id=53)
@@ -90,11 +110,12 @@ def iris(output_directory: Path = None) -> None:
     setosa_veriscolor_targets: np.ndarray = targets[indices[0]]
     processed_setosa_veriscolor: np.ndarray = qnn.preprocess(setosa_veriscolor_features)
     classical_metrics: list[Metrics] = cross_validate_knn(
-        processed_setosa_veriscolor, targets
+        processed_setosa_veriscolor, targets, k=k,
     )
     metrics: list[Metrics] = qnn.cross_validate(
         processed_setosa_veriscolor,
         setosa_veriscolor_targets,
+        k=k,
         backend=backend,
     )
     with (output_directory / "iris.txt").open("w") as fd:
@@ -107,11 +128,12 @@ def iris(output_directory: Path = None) -> None:
     setosa_virginica_targets: np.ndarray = targets[indices[0]]
     processed_setosa_virginica: np.ndarray = qnn.preprocess(setosa_virginica_features)
     classical_metrics: list[Metrics] = cross_validate_knn(
-        processed_setosa_virginica, targets
+        processed_setosa_virginica, targets, k=k,
     )
     metrics: list[Metrics] = qnn.cross_validate(
         processed_setosa_virginica,
         setosa_virginica_targets,
+        k=3,
         backend=backend,
     )
     with (output_directory / "iris.txt").open("a") as fd:
@@ -123,35 +145,44 @@ def iris(output_directory: Path = None) -> None:
     veriscolor_virginica_features: np.ndarray = features[indices[0]]
     veriscolor_virginica_targets: np.ndarray = targets[indices[0]]
     processed_veriscolor_virginica: np.ndarray = qnn.preprocess(
-        veriscolor_virginica_features
+        veriscolor_virginica_features,
     )
     classical_metrics: list[Metrics] = cross_validate_knn(
-        processed_veriscolor_virginica, targets
+        processed_veriscolor_virginica, targets, k=k,
     )
     metrics: list[Metrics] = qnn.cross_validate(
         processed_veriscolor_virginica,
         veriscolor_virginica_targets,
+        k=k,
         backend=backend,
     )
     with (output_directory / "iris.txt").open("a") as fd:
         save_results(fd, classical_metrics, metrics, "VERISCOLOR-VIRGINICA")
 
 
-def transfusion(output_directory: Path = None) -> None:
+def transfusion(output_directory: Path = None, *, k: int = 3, backend=None) -> None:
+    if not backend:
+        backend = StatevectorSimulator()
     if not output_directory:
         output_directory = Path()
     transfusion_data: pd.DataFrame = fetch_ucirepo(id=176)
     features: np.ndarray = transfusion_data.data.features
     targets: np.ndarray = np.squeeze(transfusion_data.data.targets.to_numpy(), axis=1)
     processed_features: np.ndarray = qnn.preprocess(features.to_numpy(float))
-    classical_metrics: list[Metrics] = cross_validate_knn(processed_features, targets)
-    metrics: list[Metrics] = qnn.cross_validate(processed_features, targets)
+    classical_metrics: list[Metrics] = cross_validate_knn(
+        processed_features, targets, k=k,
+    )
+    metrics: list[Metrics] = qnn.cross_validate(
+        processed_features, targets, k=k, backend=backend,
+    )
 
     with (output_directory / "transfusion.txt").open("w") as fd:
         save_results(fd, classical_metrics, metrics, "TRANSFUSION")
 
 
-def vertebral(output_directory: Path = None) -> None:
+def vertebral(output_directory: Path = None, *, k: int = 3, backend=None) -> None:
+    if not backend:
+        backend = StatevectorSimulator()
     if not output_directory:
         output_directory = Path()
     vertebra_data: pd.DataFrame = fetch_ucirepo(id=212)
@@ -161,14 +192,20 @@ def vertebral(output_directory: Path = None) -> None:
     targets.loc[targets["class"] != 0] = 1
     targets = np.squeeze(targets.to_numpy(int), axis=1)
     processed_features: np.ndarray = qnn.preprocess(features.to_numpy(float))
-    classical_metrics: list[Metrics] = cross_validate_knn(processed_features, targets)
-    metrics: list[Metrics] = qnn.cross_validate(processed_features, targets)
+    classical_metrics: list[Metrics] = cross_validate_knn(
+        processed_features, targets, k=k,
+    )
+    metrics: list[Metrics] = qnn.cross_validate(
+        processed_features, targets, k=k, backend=backend,
+    )
 
     with (output_directory / "vertebral_column.txt").open("w") as fd:
         save_results(fd, classical_metrics, metrics, "VERTEBRAL_COLUMN")
 
 
-def ecoli(output_directory: Path = None) -> None:
+def ecoli(output_directory: Path = None, *, k: int = 3, backend=None) -> None:
+    if not backend:
+        backend = StatevectorSimulator()
     if not output_directory:
         output_directory = Path()
     ecoli_data: pd.DataFrame = fetch_ucirepo(id=39)
@@ -186,48 +223,73 @@ def ecoli(output_directory: Path = None) -> None:
     indices = np.where(targets <= 1)
     processed_features: np.ndarray = qnn.preprocess(features[indices[0]])
     targets = targets[indices]
-    classical_metrics: list[Metrics] = cross_validate_knn(processed_features, targets)
-    metrics: list[Metrics] = qnn.cross_validate(processed_features, targets)
+    classical_metrics: list[Metrics] = cross_validate_knn(
+        processed_features, targets, k=k,
+    )
+    metrics: list[Metrics] = qnn.cross_validate(
+        processed_features, targets, k=k, backend=backend,
+    )
 
     with (output_directory / "ecoli.txt").open("w") as fd:
         save_results(fd, classical_metrics, metrics, "ECOLI")
 
 
-def glass(output_directory: Path = None) -> None:
+def glass(output_directory: Path = None, *, k: int = 3, backend=None) -> None:
+    if not backend:
+        backend = StatevectorSimulator()
     if not output_directory:
         output_directory = Path()
     vertebra_data: pd.DataFrame = fetch_ucirepo(id=42)
     features: np.ndarray = vertebra_data.data.features.to_numpy(float)
     targets: np.ndarray = np.squeeze(
-        vertebra_data.data.targets.to_numpy(), axis=1
+        vertebra_data.data.targets.to_numpy(), axis=1,
     ).astype(int)
     targets[targets == 0] = 8
     targets[targets == 2] = 1
     indices = np.where(targets <= 1)
     processed_features: np.ndarray = qnn.preprocess(features[indices])
-    classical_metrics: list[Metrics] = cross_validate_knn(processed_features, targets)
-    metrics: list[Metrics] = qnn.cross_validate(processed_features, targets)
+    classical_metrics: list[Metrics] = cross_validate_knn(
+        processed_features, targets, k=k,
+    )
+    metrics: list[Metrics] = qnn.cross_validate(
+        processed_features, targets, k=k, backend=backend,
+    )
 
     with (output_directory / "glass.txt").open("w") as fd:
         save_results(fd, classical_metrics, metrics, "GLASS")
 
 
-def breast_cancer(output_directory: Path = None) -> None:
+def breast_cancer(output_directory: Path = None, *, k: int = 3, backend=None) -> None:
+    if not backend:
+        backend = StatevectorSimulator()
     if not output_directory:
         output_directory = Path()
     vertebra_data: pd.DataFrame = fetch_ucirepo(id=451)
     features: np.ndarray = vertebra_data.data.features.to_numpy(float)
     targets: np.ndarray = np.squeeze(
-        vertebra_data.data.targets.to_numpy(), axis=1
+        vertebra_data.data.targets.to_numpy(), axis=1,
     ).astype(int)
     targets[targets == 1] = 0
     targets[targets == 2] = 1
     processed_features: np.ndarray = qnn.preprocess(features)
-    classical_metrics: list[Metrics] = cross_validate_knn(processed_features, targets)
-    metrics: list[Metrics] = qnn.cross_validate(processed_features, targets)
+    classical_metrics: list[Metrics] = cross_validate_knn(
+        processed_features, targets, k=k,
+    )
+    metrics: list[Metrics] = qnn.cross_validate(
+        processed_features, targets, k=k, backend=backend,
+    )
 
     with (output_directory / "breast_cancer.txt").open("w") as fd:
         save_results(fd, classical_metrics, metrics, "BREAST_CANCER")
+
+
+def parse_backend(backend_name: str):
+    if backend_name.lower() == "aersimulator":
+        return AerSimulator()
+    elif backend_name.lower() == "statevectorsimulator":
+        return StatevectorSimulator()
+    else:
+        raise ValueError("Backend %s not supported", backend_name)
 
 
 if __name__ == "__main__":
@@ -239,4 +301,6 @@ if __name__ == "__main__":
     function = getattr(modules[__name__], args.dataset)
     if function == None:
         raise ValueError("Dataset %s is not supported", args.dataset)
-    function(args.output_directory)
+
+    backend = parse_backend(args.backend)
+    function(args.output_directory, k=args.k, backend=backend)
