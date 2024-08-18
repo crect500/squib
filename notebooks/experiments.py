@@ -74,6 +74,16 @@ def parse_script_args() -> Namespace:
         help="The quantum or simulated backend on which to run the experiment",
     )
 
+    parser.add_argument(
+        "-s",
+        "--shots",
+        dest="shots",
+        type=int,
+        required=False,
+        default=1024,
+        help="The number of times to execute the resultant quantum circuits"
+    )
+
     return parser.parse_args()
 
 
@@ -93,7 +103,7 @@ def save_results(
     file_descriptor.write("\n")
 
 
-def iris(output_directory: Path = None, *, k: int = 3, backend=None) -> None:
+def iris(output_directory: Path = None, *, k: int = 3, backend=None, shots: int = 1024) -> None:
     if not backend:
         backend = StatevectorSimulator()
     if not output_directory:
@@ -117,8 +127,9 @@ def iris(output_directory: Path = None, *, k: int = 3, backend=None) -> None:
         setosa_veriscolor_targets,
         k=k,
         backend=backend,
+        shots=shots
     )
-    with (output_directory / "iris.txt").open("w") as fd:
+    with (output_directory / f"iris{k}.txt").open("w") as fd:
         save_results(fd, classical_metrics, metrics, "SETOSA-VERISCOLOR")
 
     targets[targets == 1] = 3
@@ -133,10 +144,11 @@ def iris(output_directory: Path = None, *, k: int = 3, backend=None) -> None:
     metrics: list[Metrics] = qnn.cross_validate(
         processed_setosa_virginica,
         setosa_virginica_targets,
-        k=3,
+        k=k,
         backend=backend,
+        shots=shots
     )
-    with (output_directory / "iris.txt").open("a") as fd:
+    with (output_directory / f"iris{k}.txt").open("a") as fd:
         save_results(fd, classical_metrics, metrics, "SETOSA-VIRGINICA")
 
     targets[targets == 0] = 2
@@ -155,12 +167,13 @@ def iris(output_directory: Path = None, *, k: int = 3, backend=None) -> None:
         veriscolor_virginica_targets,
         k=k,
         backend=backend,
+        shots=shots
     )
-    with (output_directory / "iris.txt").open("a") as fd:
+    with (output_directory / f"iris{k}.txt").open("a") as fd:
         save_results(fd, classical_metrics, metrics, "VERISCOLOR-VIRGINICA")
 
 
-def transfusion(output_directory: Path = None, *, k: int = 3, backend=None) -> None:
+def transfusion(output_directory: Path = None, *, k: int = 3, backend=None, shots: int = 1024) -> None:
     if not backend:
         backend = StatevectorSimulator()
     if not output_directory:
@@ -173,14 +186,14 @@ def transfusion(output_directory: Path = None, *, k: int = 3, backend=None) -> N
         processed_features, targets, k=k,
     )
     metrics: list[Metrics] = qnn.cross_validate(
-        processed_features, targets, k=k, backend=backend,
+        processed_features, targets, k=k, backend=backend, shots=shots
     )
 
-    with (output_directory / "transfusion.txt").open("w") as fd:
+    with (output_directory / f"transfusion{k}.txt").open("w") as fd:
         save_results(fd, classical_metrics, metrics, "TRANSFUSION")
 
 
-def vertebral(output_directory: Path = None, *, k: int = 3, backend=None) -> None:
+def vertebral(output_directory: Path = None, *, k: int = 3, backend=None, shots: int = 1024) -> None:
     if not backend:
         backend = StatevectorSimulator()
     if not output_directory:
@@ -196,14 +209,14 @@ def vertebral(output_directory: Path = None, *, k: int = 3, backend=None) -> Non
         processed_features, targets, k=k,
     )
     metrics: list[Metrics] = qnn.cross_validate(
-        processed_features, targets, k=k, backend=backend,
+        processed_features, targets, k=k, backend=backend, shots=shots
     )
 
-    with (output_directory / "vertebral_column.txt").open("w") as fd:
+    with (output_directory / f"vertebral_column{k}.txt").open("w") as fd:
         save_results(fd, classical_metrics, metrics, "VERTEBRAL_COLUMN")
 
 
-def ecoli(output_directory: Path = None, *, k: int = 3, backend=None) -> None:
+def ecoli(output_directory: Path = None, *, k: int = 3, backend=None, shots: int = 1024) -> None:
     if not backend:
         backend = StatevectorSimulator()
     if not output_directory:
@@ -227,14 +240,14 @@ def ecoli(output_directory: Path = None, *, k: int = 3, backend=None) -> None:
         processed_features, targets, k=k,
     )
     metrics: list[Metrics] = qnn.cross_validate(
-        processed_features, targets, k=k, backend=backend,
+        processed_features, targets, k=k, backend=backend, shots=shots
     )
 
-    with (output_directory / "ecoli.txt").open("w") as fd:
+    with (output_directory / f"ecoli{k}.txt").open("w") as fd:
         save_results(fd, classical_metrics, metrics, "ECOLI")
 
 
-def glass(output_directory: Path = None, *, k: int = 3, backend=None) -> None:
+def glass(output_directory: Path = None, *, k: int = 3, backend=None, shots: int = 1024) -> None:
     if not backend:
         backend = StatevectorSimulator()
     if not output_directory:
@@ -252,14 +265,14 @@ def glass(output_directory: Path = None, *, k: int = 3, backend=None) -> None:
         processed_features, targets, k=k,
     )
     metrics: list[Metrics] = qnn.cross_validate(
-        processed_features, targets, k=k, backend=backend,
+        processed_features, targets, k=k, backend=backend, shots=shots
     )
 
-    with (output_directory / "glass.txt").open("w") as fd:
+    with (output_directory / f"glass{k}.txt").open("w") as fd:
         save_results(fd, classical_metrics, metrics, "GLASS")
 
 
-def breast_cancer(output_directory: Path = None, *, k: int = 3, backend=None) -> None:
+def breast_cancer(output_directory: Path = None, *, k: int = 3, backend=None, shots: int = 1024) -> None:
     if not backend:
         backend = StatevectorSimulator()
     if not output_directory:
@@ -276,10 +289,10 @@ def breast_cancer(output_directory: Path = None, *, k: int = 3, backend=None) ->
         processed_features, targets, k=k,
     )
     metrics: list[Metrics] = qnn.cross_validate(
-        processed_features, targets, k=k, backend=backend,
+        processed_features, targets, k=k, backend=backend, shots=shots
     )
 
-    with (output_directory / "breast_cancer.txt").open("w") as fd:
+    with (output_directory / f"breast_cancer{k}.txt").open("w") as fd:
         save_results(fd, classical_metrics, metrics, "BREAST_CANCER")
 
 
@@ -303,4 +316,4 @@ if __name__ == "__main__":
         raise ValueError("Dataset %s is not supported", args.dataset)
 
     backend = parse_backend(args.backend)
-    function(args.output_directory, k=args.k, backend=backend)
+    function(args.output_directory, k=args.k, backend=backend, shots=args.shots)
