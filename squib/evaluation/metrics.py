@@ -43,6 +43,8 @@ class Metrics:
         ----
         truth: Known labels
         predictions: Predicted labels
+        quantum_neighbors: The quantum generated nearest neighbors labels
+        classical_neighbors: The classically generated nearest neighbors labels
 
         """
         self._populate_confusion_matrix(predictions, truth)
@@ -119,7 +121,7 @@ class Metrics:
         self: Metrics,
         quantum_neighbors: np.ndarray[int],
         classical_neighbors: np.ndarray[int],
-    ):
+    ) -> None:
         total: float = 0
         for quantum_result, classical_result in zip(
             quantum_neighbors,
@@ -136,7 +138,7 @@ class Metrics:
         self: Metrics,
         quantum_neighbors: np.ndarray[int],
         classical_neighbors: np.ndarray[int],
-    ):
+    ) -> None:
         total: float = 0
         for k in range(1, quantum_neighbors.shape[1] + 1):
             subtotal: float = 0

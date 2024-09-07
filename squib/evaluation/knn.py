@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from sklearn.model_selection import KFold
+from sklearn.model_selection import StratifiedKFold
 from sklearn.neighbors import KNeighborsClassifier
 
 from squib.evaluation.metrics import Metrics
@@ -17,7 +17,11 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 
 def cross_validate_knn(
-    features: np.ndarray, labels: np.ndarray, *, k: int = 3
+    features: np.ndarray,
+    labels: np.ndarray,
+    *,
+    k: int = 3,
+    seed: int = 1,
 ) -> list[Metrics]:
     """
     Run classical k-nearest neighbors.
@@ -26,16 +30,18 @@ def cross_validate_knn(
     ----
     features: The feature set
     labels: The labels for the feature set
+    k: The k value for knn
+    seed: Seed for cross-validation
 
     Returns:
     -------
     The metrics for the run
 
     """
-    index_generator: KFold = KFold(shuffle=True)
+    index_generator: StratifiedKFold = StratifiedKFold(shuffle=True, random_state=seed)
     metrics: list[Metrics] = []
     for iteration, (train_index, test_index) in enumerate(
-        index_generator.split(features),
+        index_generator.split(features, labels),
     ):
         logger.warning(f"Training fold {iteration + 1} / 5")
         neigbhors = KNeighborsClassifier(k)

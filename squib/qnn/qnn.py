@@ -15,7 +15,7 @@ from qiskit import (
     QuantumRegister,
 )
 from qiskit_aer import AerSimulator, StatevectorSimulator
-from sklearn.model_selection import KFold
+from sklearn.model_selection import StratifiedKFold
 from sklearn.preprocessing import StandardScaler
 
 from squib.evaluation.metrics import Metrics
@@ -326,13 +326,14 @@ def run_qnn(  # noqa: PLR0913
     return new_labels, q_nearest_neighbors, k_nearest_neighbors
 
 
-def cross_validate(
+def cross_validate(  # noqa: PLR0913
     features: np.ndarray,
     labels: np.ndarray,
     *,
     k: int = 3,
     backend: AerSimulator | None = None,
     shots: int = SHOTS16,
+    seed: int = 1,
 ) -> list[Metrics]:
     """
     Run k-nearest neighbors as a quantum algorithm with Euclidean distance.
@@ -344,14 +345,15 @@ def cross_validate(
     k: The number of neighbors to check in the k-nearest neighbors algorithm
     backend: Backend on which to run the quantum circuit. Default is
     shots: The number of times to execute the quantum circuit
+    seed: Seed for the cross validation
 
     """
     if not backend:
         backend: AerSimulator = AerSimulator()
-    index_generator: KFold = KFold(shuffle=True)
+    index_generator: StratifiedKFold = StratifiedKFold(shuffle=True, random_state=seed)
     metrics: list[Metrics] = []
     for iteration, (train_index, test_index) in enumerate(
-        index_generator.split(features),
+        index_generator.split(features, labels),
         start=1,
     ):
         logger.warning(f"Training fold {iteration} / 5")
