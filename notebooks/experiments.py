@@ -413,13 +413,13 @@ def glass(
     processed_features: np.ndarray = qnn.preprocess(features[indices])
     classical_metrics: list[Metrics] = cross_validate_knn(
         processed_features,
-        targets,
+        targets[indices],
         k=k,
         seed=seed,
     )
     metrics: list[Metrics] = qnn.cross_validate(
         processed_features,
-        targets,
+        targets[indices],
         k=k,
         backend=backend,
         shots=shots,
@@ -501,7 +501,7 @@ def parse_backend(backend_name: str) -> AerProvider | StatevectorSimulator:
 if __name__ == "__main__":
     args: Namespace = parse_script_args()
     logging.basicConfig(
-        filename=args.log_directory / f"{args.dataset}_experiment_results.log",
+        filename=args.log_directory / f"{args.dataset}_experiment_results{args.k}.log",
         level=logging.WARNING,
     )
     function = getattr(modules[__name__], args.dataset)
