@@ -18,7 +18,7 @@ from squib.qnn import qnn
 
 if TYPE_CHECKING:
     from argparse import Namespace
-    from io import TextIOWrapper
+    from typing import TextIO
 
     from qiskit_aer import AerProvider
 
@@ -103,7 +103,7 @@ def parse_script_args() -> Namespace:
 
 
 def _save_results(
-    file_descriptor: TextIOWrapper,
+    file_descriptor: TextIO,
     classical_metrics: list[Metrics],
     quantum_metrics: list[Metrics],
     dataset_name: str,
@@ -129,11 +129,22 @@ def _save_results(
     file_descriptor.write("\n")
 
 
+def _create_output_filename(
+    database_name: str, k: int, backend: AerProvider | StatevectorSimulator, shots: int,
+) -> str:
+    filename: str = database_name + "_"
+    if isinstance(backend, AerSimulator):
+        filename += "aer" + str(k) + "_shots" + str(shots)
+    elif isinstance(backend, StatevectorSimulator):
+        filename += "statevector" + str(k)
+    return filename + ".txt"
+
+
 def iris(
     output_directory: Path = Path(),
     *,
     k: int = 3,
-    backend: AerProvider | StatevectorSimulator | None=None,
+    backend: AerProvider | StatevectorSimulator | None = None,
     shots: int = 1024,
     seed: int = 1,
 ) -> None:
@@ -178,11 +189,12 @@ def iris(
         shots=shots,
         seed=seed,
     )
-    with (output_directory / f"iris{k}.txt").open("w") as fd:
+    filename: str = _create_output_filename("iris", k, backend, shots)
+    with (output_directory / filename).open("w") as fd:
         _save_results(fd, classical_metrics, metrics, "SETOSA-VERISCOLOR")
 
     targets[targets == 1] = 3
-    targets[targets == 2] = 1   # noqa: PLR2004
+    targets[targets == 2] = 1  # noqa: PLR2004
     indices = np.where(targets <= 1)
     setosa_virginica_features: np.ndarray = features[indices[0]]
     setosa_virginica_targets: np.ndarray = targets[indices[0]]
@@ -201,11 +213,11 @@ def iris(
         shots=shots,
         seed=seed,
     )
-    with (output_directory / f"iris{k}.txt").open("a") as fd:
+    with (output_directory / filename).open("a") as fd:
         _save_results(fd, classical_metrics, metrics, "SETOSA-VIRGINICA")
 
     targets[targets == 0] = 2
-    targets[targets == 3] = 0   # noqa: PLR2004
+    targets[targets == 3] = 0  # noqa: PLR2004
     indices = np.where(targets <= 1)
     veriscolor_virginica_features: np.ndarray = features[indices[0]]
     veriscolor_virginica_targets: np.ndarray = targets[indices[0]]
@@ -226,7 +238,7 @@ def iris(
         shots=shots,
         seed=seed,
     )
-    with (output_directory / f"iris{k}.txt").open("a") as fd:
+    with (output_directory / filename).open("a") as fd:
         _save_results(fd, classical_metrics, metrics, "VERISCOLOR-VIRGINICA")
 
 
@@ -234,7 +246,7 @@ def transfusion(
     output_directory: Path = Path(),
     *,
     k: int = 3,
-    backend: AerProvider | StatevectorSimulator | None=None,
+    backend: AerProvider | StatevectorSimulator | None = None,
     shots: int = 1024,
     seed: int = 1,
 ) -> None:
@@ -271,7 +283,8 @@ def transfusion(
         seed=seed,
     )
 
-    with (output_directory / f"transfusion{k}.txt").open("w") as fd:
+    filename: str = _create_output_filename("transfusion", k, backend, shots)
+    with (output_directory / filename).open("w") as fd:
         _save_results(fd, classical_metrics, metrics, "TRANSFUSION")
 
 
@@ -279,7 +292,7 @@ def vertebral(
     output_directory: Path = Path(),
     *,
     k: int = 3,
-    backend: AerProvider | StatevectorSimulator | None=None,
+    backend: AerProvider | StatevectorSimulator | None = None,
     shots: int = 1024,
     seed: int = 1,
 ) -> None:
@@ -319,7 +332,8 @@ def vertebral(
         seed=seed,
     )
 
-    with (output_directory / f"vertebral_column{k}.txt").open("w") as fd:
+    filename: str = _create_output_filename("vertebral", k, backend, shots)
+    with (output_directory / filename).open("w") as fd:
         _save_results(fd, classical_metrics, metrics, "VERTEBRAL_COLUMN")
 
 
@@ -327,7 +341,7 @@ def ecoli(
     output_directory: Path = Path(),
     *,
     k: int = 3,
-    backend: AerProvider | StatevectorSimulator | None=None,
+    backend: AerProvider | StatevectorSimulator | None = None,
     shots: int = 1024,
     seed: int = 1,
 ) -> None:
@@ -375,7 +389,8 @@ def ecoli(
         seed=seed,
     )
 
-    with (output_directory / f"ecoli{k}.txt").open("w") as fd:
+    filename: str = _create_output_filename("ecoli", k, backend, shots)
+    with (output_directory / filename).open("w") as fd:
         _save_results(fd, classical_metrics, metrics, "ECOLI")
 
 
@@ -383,7 +398,7 @@ def glass(
     output_directory: Path = Path(),
     *,
     k: int = 3,
-    backend: AerProvider | StatevectorSimulator | None=None,
+    backend: AerProvider | StatevectorSimulator | None = None,
     shots: int = 1024,
     seed: int = 1,
 ) -> None:
@@ -408,7 +423,7 @@ def glass(
         axis=1,
     ).astype(int)
     targets[targets == 0] = 8
-    targets[targets == 2] = 1   # noqa: PLR2004
+    targets[targets == 2] = 1  # noqa: PLR2004
     indices = np.where(targets <= 1)
     processed_features: np.ndarray = qnn.preprocess(features[indices])
     classical_metrics: list[Metrics] = cross_validate_knn(
@@ -426,7 +441,8 @@ def glass(
         seed=seed,
     )
 
-    with (output_directory / f"glass{k}.txt").open("w") as fd:
+    filename: str = _create_output_filename("glass", k, backend, shots)
+    with (output_directory / filename).open("w") as fd:
         _save_results(fd, classical_metrics, metrics, "GLASS")
 
 
@@ -434,7 +450,7 @@ def breast_cancer(
     output_directory: Path = Path(),
     *,
     k: int = 3,
-    backend: AerProvider | StatevectorSimulator | None=None,
+    backend: AerProvider | StatevectorSimulator | None = None,
     shots: int = 1024,
     seed: int = 1,
 ) -> None:
@@ -459,7 +475,7 @@ def breast_cancer(
         axis=1,
     ).astype(int)
     targets[targets == 1] = 0
-    targets[targets == 2] = 1   # noqa: PLR2004
+    targets[targets == 2] = 1  # noqa: PLR2004
     processed_features: np.ndarray = qnn.preprocess(features)
     classical_metrics: list[Metrics] = cross_validate_knn(
         processed_features,
@@ -476,7 +492,8 @@ def breast_cancer(
         seed=seed,
     )
 
-    with (output_directory / f"breast_cancer{k}.txt").open("w") as fd:
+    filename: str = _create_output_filename("breast_cancer", k, backend, shots)
+    with (output_directory / filename).open("w") as fd:
         _save_results(fd, classical_metrics, metrics, "BREAST_CANCER")
 
 
@@ -506,7 +523,7 @@ if __name__ == "__main__":
     )
     function = getattr(modules[__name__], args.dataset)
     if function is None:
-        raise ValueError("Dataset %s is not supported", args.dataset)   # noqa: TRY003
+        raise ValueError("Dataset %s is not supported", args.dataset)  # noqa: TRY003
 
     backend = parse_backend(args.backend)
     function(
