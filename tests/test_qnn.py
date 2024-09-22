@@ -111,7 +111,7 @@ def test_assign_label(size: int) -> None:
     data["value"] = values
     labels: np.ndarray = random_generator.choice(np.arange(2), len(values))
     data["class"] = labels
-    new_label, nearest_neighbors = qnn._assign_label(values, labels)
+    new_label, nearest_neighbors = qnn.assign_label(values, labels)
     data: pd.DataFrame = data.sort_values(
         by="value",
         ascending=False,

@@ -18,6 +18,7 @@ from qiskit_aer import AerSimulator, StatevectorSimulator
 from sklearn.model_selection import StratifiedKFold
 from sklearn.preprocessing import StandardScaler
 
+from squib.evaluation.knn import assign_label
 from squib.evaluation.metrics import Metrics
 from squib.quclidean import quclidean
 
@@ -96,33 +97,6 @@ def _run_qnn_circuit(
     )
 
 
-def _assign_label(
-    results: np.ndarray,
-    labels: np.ndarray,
-    *,
-    k: int = 3,
-) -> tuple[int, np.ndarray[int]]:
-    """
-    Assign result to label based on k-nearest neighbors.
-
-    Args:
-    ----
-    results: The scaled inner products from processed qnn circuit results
-    labels: The labels corresponding to the results
-    k: The number of neighbors to check in the k-nearest neighbors algorithm
-
-    Returns:
-    -------
-    The determined label
-
-    """
-    k_indices: np.ndarray[int] = np.argpartition(results, -k)[:k]
-    k_greatest: np.ndarray[int] = labels[k_indices]
-    logger.warning(k_greatest)
-    values, counts = np.unique(k_greatest, return_counts=True)
-    return int(values[np.argmax(counts)]), k_greatest
-
-
 def _execute_qnn(  # noqa: PLR0913
     circuit: QuantumCircuit,
     feature: np.ndarray,
@@ -190,7 +164,7 @@ def _execute_qnn(  # noqa: PLR0913
             results,
         )
 
-    return _assign_label(distances[:, 0], labels, k=k)
+    return assign_label(distances[:, 0], labels, k=k)
 
 
 def run_qnn(  # noqa: PLR0913
@@ -282,7 +256,7 @@ def run_qnn(  # noqa: PLR0913
         dtype=int,
     )
     for iteration, test_feature in enumerate(normalized_test_set):
-        logger.warning(f"Building circuit {iteration} / {len(normalized_test_set)}")
+        logger.warning(f"Building circuit {iteration + 1} / {len(normalized_test_set)}")
         new_label, q_greatest = _execute_qnn(
             base_circuit,
             test_feature,
@@ -304,7 +278,7 @@ def run_qnn(  # noqa: PLR0913
             np.expand_dims(test_feature, 0),
             axis=0,
         )
-        k_nearest_neighbors[iteration] = _assign_label(
+        k_nearest_neighbors[iteration] = assign_label(
             np.sum(elementwise_difference * elementwise_difference, axis=1),
             labels=working_labels,
             k=k,

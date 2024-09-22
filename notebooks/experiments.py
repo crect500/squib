@@ -130,7 +130,10 @@ def _save_results(
 
 
 def _create_output_filename(
-    database_name: str, k: int, backend: AerProvider | StatevectorSimulator, shots: int,
+    database_name: str,
+    k: int,
+    backend: AerProvider | StatevectorSimulator,
+    shots: int,
 ) -> str:
     filename: str = database_name + "_"
     if isinstance(backend, AerSimulator):

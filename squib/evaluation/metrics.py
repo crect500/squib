@@ -8,6 +8,7 @@ import numpy as np
 
 
 class Metrics:
+
     """
     Store metrics of a model prediction.
 
