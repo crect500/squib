@@ -9,7 +9,11 @@ lint.extend-ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "squib/*" = [
+    "FA102",    # Python 3.10 does not require from __future__ statement
     "G004",     # Allow f-strings in log statements
+]
+"squib/evaluation/parse_results.py" = [
+    "T201",     # Allow print to stdout
 ]
 "tests/*" = [
     "INP001",   # Do not use an __init__.py for unit test directory
@@ -17,8 +21,9 @@ lint.extend-ignore = [
     "D103",     # Do not require method docstrings
     "S101",     # Asserts needed for unit tests
     "SLF001",   # Allow access to private methods for testing
+    "TCH002",   # Python 3.10 compiles as type-checking
 ]
 "notebooks/experiments.py" = [
+    "INP001",   # Do not install notebooks directory
     "TCH002",   # Python 3.10 compiles as type-checking
-    "INP001"    # Do not install notebooks directory
 ]
