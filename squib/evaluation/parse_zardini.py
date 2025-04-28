@@ -157,7 +157,7 @@ def process_execution_method(
 
 def convert_headers(results: pd.DataFrame) -> None:
     """
-    Convert the headers to names compatible with qnn results.
+    Convert the headers to names compatible with QKNN results.
 
     Args:
     ----

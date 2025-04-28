@@ -13,7 +13,7 @@ from qiskit import AncillaRegister, QuantumCircuit, QuantumRegister
 from qiskit.result import Counts
 from qiskit_aer import StatevectorSimulator
 
-from squib.qnn import qnn
+from squib.qknn import qknn
 from squib.quclidean import quclidean
 from tests.conftest import generate_euclidean_circuit_results
 
@@ -25,13 +25,13 @@ if TYPE_CHECKING:
 def test_preprocess(rows: int, columns: int) -> None:
     random_generator: np.random.Generator = np.random.default_rng()
     data: np.ndarray = random_generator.uniform(size=(rows, columns))
-    scaled_data: pl.DataFrame = qnn.preprocess(pd.DataFrame(data))
+    scaled_data: pl.DataFrame = qknn.preprocess(pd.DataFrame(data))
     assert data.shape == scaled_data.shape
 
 
 @given(integers(min_value=1, max_value=3), integers(min_value=1, max_value=3))
 @settings(deadline=1000, max_examples=5)
-def test_run_qnn_circuit(
+def test_run_qknn_circuit(
     vecset1_qubits: int,
     vector_qubits: int,
 ) -> None:
@@ -82,9 +82,9 @@ def test_run_qnn_circuit(
         backend=backend,
         as_circuit=True,
     )
-    solution: Counts = qnn._run_qnn_circuit(circuit, feature_circuit)
+    solution: Counts = qknn._run_qknn_circuit(circuit, feature_circuit)
     assert isinstance(solution, Counts)
-    statevector_solution: np.ndarray = qnn._run_qnn_circuit(
+    statevector_solution: np.ndarray = qknn._run_qknn_circuit(
         circuit,
         feature_circuit,
         backend=StatevectorSimulator(),
@@ -111,7 +111,7 @@ def test_assign_label(size: int) -> None:
     data["value"] = values
     labels: np.ndarray = random_generator.choice(np.arange(2), len(values))
     data["class"] = labels
-    new_label, nearest_neighbors = qnn.assign_label(values, labels)
+    new_label, nearest_neighbors = qknn.assign_label(values, labels)
     data: pd.DataFrame = data.sort_values(
         by="value",
         ascending=False,
@@ -121,9 +121,9 @@ def test_assign_label(size: int) -> None:
     assert new_label == label_counts.index[0]
 
 
-@mock.patch("squib.qnn.qnn._run_qnn_circuit")
+@mock.patch("squib.qknn.qknn._run_qknn_circuit")
 @given(integers(min_value=7, max_value=50), integers(min_value=1, max_value=7))
-def test_execute_qnn(
+def test_execute_qknn(
     mock_run: mock.Mock,
     train_set_size: int,
     vector_size: int,
@@ -140,17 +140,17 @@ def test_execute_qnn(
     mock_run.return_value = results_dict
     for k in [3, 5, 7]:
         with mock.patch("squib.quclidean.quclidean.apply_state_to_index"):
-            qnn._execute_qnn(circuit, feature, labels, train_set_size, vector_size, k=k)
+            qknn._execute_qknn(circuit, feature, labels, train_set_size, vector_size, k=k)
 
 
-@mock.patch("squib.qnn.qnn._execute_qnn")
+@mock.patch("squib.qknn.qknn._execute_qknn")
 @given(
     integers(min_value=3, max_value=20),
     integers(min_value=1, max_value=20),
     integers(min_value=1, max_value=7),
 )
 @settings(deadline=350)
-def test_run_circuit(
+def test_run_qknn(
     mock_execute: mock.Mock,
     train_set_size: int,
     test_set_size: int,
@@ -169,7 +169,7 @@ def test_run_circuit(
     with mock.patch("qiskit.QuantumCircuit.compose"), mock.patch(
         "squib.quclidean.quclidean.encode_vectors",
     ):
-        new_labels, q_neighbors, k_neighbors = qnn.run_qnn(
+        new_labels, q_neighbors, k_neighbors = qknn.run_qknn(
             training_set,
             test_set,
             labels,
@@ -178,13 +178,9 @@ def test_run_circuit(
     assert len(new_labels) == train_set_size + test_set_size
 
 
-@mock.patch("squib.qnn.qnn.run_qnn")
-@mock.patch("squib.qnn.qnn.multilabel_confusion_matrix")
-@mock.patch("squib.qnn.qnn.accuracy_score")
+@mock.patch("squib.qknn.qknn.run_qknn")
 @given(integers(min_value=10, max_value=50))
 def test_cross_validate(
-    mock_accuracy: mock.Mock,
-    mock_confusion: mock.Mock,
     mock_run: mock.Mock,
     feature_quantity: int,
 ) -> None:
@@ -194,10 +190,9 @@ def test_cross_validate(
         [0, 1],
         size=ceil(feature_quantity / fold_quantity),
     )
-    mock_run.return_value = fake_labels
-    mock_confusion.return_value = random_generator.integers(0, 1, size=(2, 2))
-    mock_accuracy.return_value = random_generator.integers(0, 1, size=len(fake_labels))
+    fake_neighbors: np.ndarray = random_generator.choice([0, 1], size=(len(fake_labels), 3))
+    mock_run.return_value = fake_labels, fake_neighbors, fake_neighbors
     features: np.ndarray = random_generator.uniform(size=(feature_quantity, 2))
     labels: np.ndarray = random_generator.choice([0, 1], feature_quantity)
-    metrics: list[qnn.Metrics] = qnn.cross_validate(features, labels)
+    metrics: list[qknn.Metrics] = qknn.cross_validate(features, labels)
     assert len(metrics) == fold_quantity

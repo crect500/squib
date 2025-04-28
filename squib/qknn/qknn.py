@@ -31,7 +31,7 @@ SHOTS16: int = 2**16
 logger: logging.Logger = logging.getLogger(__name__)
 
 
-def preprocess(data: pd.DataFrame) -> pl.DataFrame:
+def preprocess(data: pd.DataFrame) -> np.ndarray:
     """
     Convert data into z-scores.
 
@@ -51,7 +51,7 @@ def preprocess(data: pd.DataFrame) -> pl.DataFrame:
     return scaler.transform(data).to_numpy()
 
 
-def _run_qnn_circuit(
+def _run_qknn_circuit(
     circuit: QuantumCircuit,
     feature_circuit: QuantumCircuit,
     *,
@@ -59,7 +59,7 @@ def _run_qnn_circuit(
     shots: int = SHOTS16,
 ) -> Counts | np.ndarray:
     """
-    Given a base circuit, runs the qnn circuit for one test feature.
+    Given a base circuit, runs the QKNN circuit for one test feature.
 
     Args:
     ----
@@ -76,20 +76,20 @@ def _run_qnn_circuit(
     """
     if backend is None:
         backend = AerSimulator()
-    qnn_circuit: QuantumCircuit = circuit.compose(
+    qknn_circuit: QuantumCircuit = circuit.compose(
         feature_circuit,
         [*circuit.qregs[0], *circuit.qregs[2], *circuit.qregs[3]],
     )
-    qnn_circuit.h(0)
-    measurement_bits = ClassicalRegister(qnn_circuit.num_qubits)
+    qknn_circuit.h(0)
+    measurement_bits = ClassicalRegister(qknn_circuit.num_qubits)
     if isinstance(backend, StatevectorSimulator):
-        return np.real(backend.run(qnn_circuit).result().get_statevector())
+        return np.real(backend.run(qknn_circuit).result().get_statevector())
 
-    qnn_circuit.add_register(measurement_bits)
-    qnn_circuit.measure_all(add_bits=False)
+    qknn_circuit.add_register(measurement_bits)
+    qknn_circuit.measure_all(add_bits=False)
     return (
         backend.run(
-            qnn_circuit,
+            qknn_circuit,
             shots=shots,
         )
         .result()
@@ -97,7 +97,7 @@ def _run_qnn_circuit(
     )
 
 
-def _execute_qnn(  # noqa: PLR0913
+def _execute_qknn(  # noqa: PLR0913
     circuit: QuantumCircuit,
     feature: np.ndarray,
     labels: np.ndarray,
@@ -138,7 +138,7 @@ def _execute_qnn(  # noqa: PLR0913
         backend=backend,
         as_circuit=True,
     )
-    results: dict[str, int] | np.ndarray = _run_qnn_circuit(
+    results: dict[str, int] | np.ndarray = _run_qknn_circuit(
         circuit,
         feature_circuit,
         backend=backend,
@@ -167,7 +167,7 @@ def _execute_qnn(  # noqa: PLR0913
     return assign_label(distances[:, 0], labels, k=k)
 
 
-def run_qnn(  # noqa: PLR0913
+def run_qknn(  # noqa: PLR0913
     training_set: np.ndarray,
     test_set: np.ndarray,
     labels: np.ndarray,
@@ -257,7 +257,7 @@ def run_qnn(  # noqa: PLR0913
     )
     for iteration, test_feature in enumerate(normalized_test_set):
         logger.warning(f"Building circuit {iteration + 1} / {len(normalized_test_set)}")
-        new_label, q_greatest = _execute_qnn(
+        new_label, q_greatest = _execute_qknn(
             base_circuit,
             test_feature,
             working_labels,
@@ -305,7 +305,7 @@ def cross_validate(  # noqa: PLR0913
     labels: np.ndarray,
     *,
     k: int = 3,
-    backend: AerSimulator | None = None,
+    backend: AerSimulator | StatevectorSimulator | None = None,
     shots: int = SHOTS16,
     seed: int = 1,
 ) -> list[Metrics]:
@@ -331,7 +331,7 @@ def cross_validate(  # noqa: PLR0913
         start=1,
     ):
         logger.warning(f"Training fold {iteration} / 5")
-        new_labels, q_nearest_neighbors, k_nearest_neighbors = run_qnn(
+        new_labels, q_nearest_neighbors, k_nearest_neighbors = run_qknn(
             features[train_index],
             features[test_index],
             labels[train_index],

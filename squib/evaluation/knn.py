@@ -24,7 +24,7 @@ def assign_label(
 
     Args:
     ----
-    results: The scaled inner products from processed qnn circuit results
+    results: The scaled inner products from processed QKNN circuit results
     labels: The labels corresponding to the results
     k: The number of neighbors to check in the k-nearest neighbors algorithm
 

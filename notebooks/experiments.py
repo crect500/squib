@@ -11,10 +11,12 @@ from typing import TYPE_CHECKING
 import numpy as np
 import pandas as pd
 from qiskit_aer import AerSimulator, StatevectorSimulator
+from qiskit_aer.noise import NoiseModel
+from qiskit_ibm_runtime import QiskitRuntimeService
 from ucimlrepo import fetch_ucirepo
 
 from squib.evaluation.knn import cross_validate_knn
-from squib.qnn import qnn
+from squib.qknn import qknn
 
 if TYPE_CHECKING:
     from argparse import Namespace
@@ -30,7 +32,7 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 def parse_script_args() -> Namespace:
     """Parse command line arguments."""
-    parser = ArgumentParser(prog="Run KNN and QNN for the UCI Iris dataset")
+    parser = ArgumentParser(prog="Run KNN and QKNN for the UCI Iris dataset")
 
     parser.add_argument(
         "-d",
@@ -38,7 +40,7 @@ def parse_script_args() -> Namespace:
         dest="dataset",
         type=str,
         required=True,
-        help="The name of the dataset to run qnn on",
+        help="The name of the dataset to run QKNN on",
     )
 
     parser.add_argument(
@@ -91,6 +93,33 @@ def parse_script_args() -> Namespace:
     )
 
     parser.add_argument(
+        "-m",
+        dest="method",
+        type=str,
+        required=False,
+        default=None,
+        help="The simulation method for the AerSimulator",
+    )
+
+    parser.add_argument(
+        "-i",
+        dest="ibmq_backend",
+        type=str,
+        required=False,
+        default=None,
+        help="The IBMQ backend for the AerSimulator",
+    )
+
+    parser.add_argument(
+        "-t",
+        dest="token_filepath",
+        type=Path,
+        required=False,
+        default=None,
+        help="The filepath to your ASCII IBMQ token",
+    )
+
+    parser.add_argument(
         "--seed",
         dest="seed",
         type=int,
@@ -98,6 +127,8 @@ def parse_script_args() -> Namespace:
         default=1,
         help="The seed for the cross-validator",
     )
+
+
 
     return parser.parse_args()
 
@@ -177,14 +208,14 @@ def iris(
     indices = np.where(targets <= 1)
     setosa_veriscolor_features: np.ndarray = features[indices[0]]
     setosa_veriscolor_targets: np.ndarray = targets[indices[0]]
-    processed_setosa_veriscolor: np.ndarray = qnn.preprocess(setosa_veriscolor_features)
+    processed_setosa_veriscolor: np.ndarray = qknn.preprocess(setosa_veriscolor_features)
     classical_metrics: list[Metrics] = cross_validate_knn(
         processed_setosa_veriscolor,
         setosa_veriscolor_targets,
         k=k,
         seed=seed,
     )
-    metrics: list[Metrics] = qnn.cross_validate(
+    metrics: list[Metrics] = qknn.cross_validate(
         processed_setosa_veriscolor,
         setosa_veriscolor_targets,
         k=k,
@@ -201,14 +232,14 @@ def iris(
     indices = np.where(targets <= 1)
     setosa_virginica_features: np.ndarray = features[indices[0]]
     setosa_virginica_targets: np.ndarray = targets[indices[0]]
-    processed_setosa_virginica: np.ndarray = qnn.preprocess(setosa_virginica_features)
+    processed_setosa_virginica: np.ndarray = qknn.preprocess(setosa_virginica_features)
     classical_metrics: list[Metrics] = cross_validate_knn(
         processed_setosa_virginica,
         setosa_virginica_targets,
         k=k,
         seed=seed,
     )
-    metrics: list[Metrics] = qnn.cross_validate(
+    metrics: list[Metrics] = qknn.cross_validate(
         processed_setosa_virginica,
         setosa_virginica_targets,
         k=k,
@@ -224,7 +255,7 @@ def iris(
     indices = np.where(targets <= 1)
     veriscolor_virginica_features: np.ndarray = features[indices[0]]
     veriscolor_virginica_targets: np.ndarray = targets[indices[0]]
-    processed_veriscolor_virginica: np.ndarray = qnn.preprocess(
+    processed_veriscolor_virginica: np.ndarray = qknn.preprocess(
         veriscolor_virginica_features,
     )
     classical_metrics: list[Metrics] = cross_validate_knn(
@@ -233,7 +264,7 @@ def iris(
         k=k,
         seed=seed,
     )
-    metrics: list[Metrics] = qnn.cross_validate(
+    metrics: list[Metrics] = qknn.cross_validate(
         processed_veriscolor_virginica,
         veriscolor_virginica_targets,
         k=k,
@@ -270,14 +301,14 @@ def transfusion(
     transfusion_data: pd.DataFrame = fetch_ucirepo(id=176)
     features: np.ndarray = transfusion_data.data.features
     targets: np.ndarray = np.squeeze(transfusion_data.data.targets.to_numpy(), axis=1)
-    processed_features: np.ndarray = qnn.preprocess(features.to_numpy(float))
+    processed_features: np.ndarray = qknn.preprocess(features.to_numpy(float))
     classical_metrics: list[Metrics] = cross_validate_knn(
         processed_features,
         targets,
         k=k,
         seed=seed,
     )
-    metrics: list[Metrics] = qnn.cross_validate(
+    metrics: list[Metrics] = qknn.cross_validate(
         processed_features,
         targets,
         k=k,
@@ -319,14 +350,14 @@ def vertebral(
     targets.loc[targets["class"] == "Normal"] = 0
     targets.loc[targets["class"] != 0] = 1
     targets = np.squeeze(targets.to_numpy(int), axis=1)
-    processed_features: np.ndarray = qnn.preprocess(features.to_numpy(float))
+    processed_features: np.ndarray = qknn.preprocess(features.to_numpy(float))
     classical_metrics: list[Metrics] = cross_validate_knn(
         processed_features,
         targets,
         k=k,
         seed=seed,
     )
-    metrics: list[Metrics] = qnn.cross_validate(
+    metrics: list[Metrics] = qknn.cross_validate(
         processed_features,
         targets,
         k=k,
@@ -375,7 +406,7 @@ def ecoli(
     targets.loc[targets["class"] == "pp"] = 7
     targets = np.squeeze(targets.to_numpy(int), axis=1)
     indices = np.where(targets <= 1)
-    processed_features: np.ndarray = qnn.preprocess(features[indices[0]])
+    processed_features: np.ndarray = qknn.preprocess(features[indices[0]])
     targets = targets[indices]
     classical_metrics: list[Metrics] = cross_validate_knn(
         processed_features,
@@ -383,7 +414,7 @@ def ecoli(
         k=k,
         seed=seed,
     )
-    metrics: list[Metrics] = qnn.cross_validate(
+    metrics: list[Metrics] = qknn.cross_validate(
         processed_features,
         targets,
         k=k,
@@ -428,7 +459,7 @@ def glass(
     targets[targets == 0] = 8
     targets[targets == 2] = 0  # noqa: PLR2004
     indices = np.where(targets <= 1)
-    processed_features: np.ndarray = qnn.preprocess(features[indices])
+    processed_features: np.ndarray = qknn.preprocess(features[indices])
     print(targets[indices])
     classical_metrics: list[Metrics] = cross_validate_knn(
         processed_features,
@@ -436,7 +467,7 @@ def glass(
         k=k,
         seed=seed,
     )
-    metrics: list[Metrics] = qnn.cross_validate(
+    metrics: list[Metrics] = qknn.cross_validate(
         processed_features,
         targets[indices],
         k=k,
@@ -454,7 +485,7 @@ def breast_cancer(
     output_directory: Path = Path(),
     *,
     k: int = 3,
-    backend: AerProvider | StatevectorSimulator | None = None,
+    backend: AerSimulator | StatevectorSimulator | None = None,
     shots: int = 1024,
     seed: int = 1,
 ) -> None:
@@ -480,14 +511,14 @@ def breast_cancer(
     ).astype(int)
     targets[targets == 1] = 0
     targets[targets == 2] = 1  # noqa: PLR2004
-    processed_features: np.ndarray = qnn.preprocess(features)
+    processed_features: np.ndarray = qknn.preprocess(features)
     classical_metrics: list[Metrics] = cross_validate_knn(
         processed_features,
         targets,
         k=k,
         seed=seed,
     )
-    metrics: list[Metrics] = qnn.cross_validate(
+    metrics: list[Metrics] = qknn.cross_validate(
         processed_features,
         targets,
         k=k,
@@ -501,17 +532,54 @@ def breast_cancer(
         _save_results(fd, classical_metrics, metrics, "BREAST_CANCER")
 
 
-def parse_backend(backend_name: str) -> AerProvider | StatevectorSimulator:
+def _setup_aer_simulator(method: str | None = None, backend_name: str | None = None, token_filepath: Path | None = None) -> AerSimulator:
+    """
+    Set up AerSimulator given different method and backend configurations.
+
+    Args
+    ----
+    method: The optional simulation method.
+    backend_name: The name of the backend on which to base the noise model.
+    token_filepath: The path to your ibm quantum token ASCII file. Required for IBMQ.
+
+    Returns
+    -------
+    The configured AerSimulator backend.
+    """
+    if backend_name:
+        if not token_filepath:
+            raise RuntimeError(f"Must provide token filepath for backend {backend_name}")
+
+        with token_filepath.open() as fd:
+            token: str = fd.read()
+
+        ibmq_service = QiskitRuntimeService(channel="ibm_quantum", token=token)
+        backend = ibmq_service.backend(backend_name)
+        if method:
+            return AerSimulator(method=method, noise_model=NoiseModel.from_backend(backend))
+        else:
+            return AerSimulator(noise_model=NoiseModel.from_backend(backend))
+
+    if method:
+        return AerSimulator(method=method)
+
+    return AerSimulator()
+
+
+def _parse_backend(backend_name: str, method: str | None = None, ibmq_backend: str | None = None, token_filepath: Path | None = None) -> AerSimulator | StatevectorSimulator:
     """
     Parse a backend string to return that backend.
 
     Args:
     ----
     backend_name: The name of the backend to retrieve
+    method: The optional simulation method.
+    ibmq_backend: The name of the backend on which to base the noise model.
+    token_filepath: The path to your ibm quantum token ASCII file. Required for IBMQ.
 
     """
     if backend_name.lower() == "aersimulator":
-        return AerSimulator()
+        return _setup_aer_simulator(method, ibmq_backend, token_filepath)
 
     if backend_name.lower() == "statevectorsimulator":
         return StatevectorSimulator()
@@ -529,7 +597,7 @@ if __name__ == "__main__":
     if function is None:
         raise ValueError("Dataset %s is not supported", args.dataset)  # noqa: TRY003
 
-    backend = parse_backend(args.backend)
+    backend = _parse_backend(args.backend, args.method, args.ibmq_backend, args.token_filepath)
     function(
         args.output_directory,
         k=args.k,
