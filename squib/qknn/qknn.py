@@ -24,7 +24,6 @@ from squib.quclidean import quclidean
 
 if TYPE_CHECKING:
     import pandas as pd
-    import polars as pl
     from qiskit.result import Counts
 
 SHOTS16: int = 2**16
@@ -91,6 +90,8 @@ def _run_qknn_circuit(
         backend.run(
             qknn_circuit,
             shots=shots,
+            memory=True,
+            seed_simulator=42,
         )
         .result()
         .get_counts()

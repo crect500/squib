@@ -13,6 +13,7 @@ import pandas as pd
 from qiskit_aer import AerSimulator, StatevectorSimulator
 from qiskit_aer.noise import NoiseModel
 from qiskit_ibm_runtime import QiskitRuntimeService
+from qiskit_ibm_runtime.fake_provider import FakeMumbaiV2
 from ucimlrepo import fetch_ucirepo
 
 from squib.evaluation.knn import cross_validate_knn
@@ -128,8 +129,6 @@ def parse_script_args() -> Namespace:
         help="The seed for the cross-validator",
     )
 
-
-
     return parser.parse_args()
 
 
@@ -208,7 +207,9 @@ def iris(
     indices = np.where(targets <= 1)
     setosa_veriscolor_features: np.ndarray = features[indices[0]]
     setosa_veriscolor_targets: np.ndarray = targets[indices[0]]
-    processed_setosa_veriscolor: np.ndarray = qknn.preprocess(setosa_veriscolor_features)
+    processed_setosa_veriscolor: np.ndarray = qknn.preprocess(
+        setosa_veriscolor_features
+    )
     classical_metrics: list[Metrics] = cross_validate_knn(
         processed_setosa_veriscolor,
         setosa_veriscolor_targets,
@@ -532,41 +533,66 @@ def breast_cancer(
         _save_results(fd, classical_metrics, metrics, "BREAST_CANCER")
 
 
-def _setup_aer_simulator(method: str | None = None, backend_name: str | None = None, token_filepath: Path | None = None) -> AerSimulator:
+def _setup_aer_simulator(
+    method: str | None = None,
+    backend_name: str | None = None,
+    token_filepath: Path | None = None,
+) -> AerSimulator:
     """
     Set up AerSimulator given different method and backend configurations.
 
-    Args
+    Args:
     ----
     method: The optional simulation method.
     backend_name: The name of the backend on which to base the noise model.
     token_filepath: The path to your ibm quantum token ASCII file. Required for IBMQ.
 
-    Returns
+    Returns:
     -------
     The configured AerSimulator backend.
+
     """
     if backend_name:
-        if not token_filepath:
-            raise RuntimeError(f"Must provide token filepath for backend {backend_name}")
+        if backend_name.split("_")[0] == "ibm":
+            if not token_filepath:
+                raise RuntimeError(
+                    f"Must provide token filepath for backend {backend_name}"
+                )
 
-        with token_filepath.open() as fd:
-            token: str = fd.read()
+            with token_filepath.open() as fd:
+                token: str = fd.read().strip()
 
-        ibmq_service = QiskitRuntimeService(channel="ibm_quantum", token=token)
-        backend = ibmq_service.backend(backend_name)
+            ibmq_service = QiskitRuntimeService(channel="ibm_quantum", token=token)
+            backend = ibmq_service.backend(backend_name)
+        elif backend_name == "mumbai":
+            backend = FakeMumbaiV2()
         if method:
-            return AerSimulator(method=method, noise_model=NoiseModel.from_backend(backend))
+            return AerSimulator(
+                method=method,
+                noise_model=NoiseModel.from_backend(backend),
+                seed_simulator=42,
+                max_parallel_threads=0,
+                max_parallel_shots=0,
+            )
         else:
-            return AerSimulator(noise_model=NoiseModel.from_backend(backend))
-
+            return AerSimulator(
+                noise_model=NoiseModel.from_backend(backend),
+                seed_simulator=42,
+                max_parallel_threads=0,
+                max_parallel_shots=0,
+            )
     if method:
         return AerSimulator(method=method)
 
     return AerSimulator()
 
 
-def _parse_backend(backend_name: str, method: str | None = None, ibmq_backend: str | None = None, token_filepath: Path | None = None) -> AerSimulator | StatevectorSimulator:
+def _parse_backend(
+    backend_name: str,
+    method: str | None = None,
+    ibmq_backend: str | None = None,
+    token_filepath: Path | None = None,
+) -> AerSimulator | StatevectorSimulator:
     """
     Parse a backend string to return that backend.
 
@@ -597,7 +623,9 @@ if __name__ == "__main__":
     if function is None:
         raise ValueError("Dataset %s is not supported", args.dataset)  # noqa: TRY003
 
-    backend = _parse_backend(args.backend, args.method, args.ibmq_backend, args.token_filepath)
+    backend = _parse_backend(
+        args.backend, args.method, args.ibmq_backend, args.token_filepath
+    )
     function(
         args.output_directory,
         k=args.k,

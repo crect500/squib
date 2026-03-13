@@ -54,6 +54,7 @@ python3 experiments.py [options]
 |log_directory|-l|The directory in which to save log files to|
 |k|-k|The k-value for k-nearest neighbors|
 |backend|-b|The name of the backend to use|
+|method|-m|The simulation method to use, as defined in the AerSimulator API docs|
 |shots|-s|The shots for which to run the simulator|
 |seed|--seed|The seed to use for random generators|
 

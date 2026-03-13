@@ -140,7 +140,9 @@ def test_execute_qknn(
     mock_run.return_value = results_dict
     for k in [3, 5, 7]:
         with mock.patch("squib.quclidean.quclidean.apply_state_to_index"):
-            qknn._execute_qknn(circuit, feature, labels, train_set_size, vector_size, k=k)
+            qknn._execute_qknn(
+                circuit, feature, labels, train_set_size, vector_size, k=k
+            )
 
 
 @mock.patch("squib.qknn.qknn._execute_qknn")
@@ -190,7 +192,9 @@ def test_cross_validate(
         [0, 1],
         size=ceil(feature_quantity / fold_quantity),
     )
-    fake_neighbors: np.ndarray = random_generator.choice([0, 1], size=(len(fake_labels), 3))
+    fake_neighbors: np.ndarray = random_generator.choice(
+        [0, 1], size=(len(fake_labels), 3)
+    )
     mock_run.return_value = fake_labels, fake_neighbors, fake_neighbors
     features: np.ndarray = random_generator.uniform(size=(feature_quantity, 2))
     labels: np.ndarray = random_generator.choice([0, 1], feature_quantity)
