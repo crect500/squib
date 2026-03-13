@@ -168,8 +168,11 @@ def test_run_qknn(
     )
     test_set: np.ndarray = random_generator.uniform(size=(test_set_size, vector_size))
     labels: np.ndarray = random_generator.choice(2, train_set_size)
-    with mock.patch("qiskit.QuantumCircuit.compose"), mock.patch(
-        "squib.quclidean.quclidean.encode_vectors",
+    with (
+        mock.patch("qiskit.QuantumCircuit.compose"),
+        mock.patch(
+            "squib.quclidean.quclidean.encode_vectors",
+        ),
     ):
         new_labels, q_neighbors, k_neighbors = qknn.run_qknn(
             training_set,

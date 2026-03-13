@@ -31,9 +31,12 @@ def test_jaccard(k: int, feature_quantity: int) -> None:
         jaccard += correct / k
 
     jaccard /= len(q_neighbors)
-    with mock.patch(
-        "squib.evaluation.metrics.Metrics._populate_confusion_matrix",
-    ), mock.patch("squib.evaluation.metrics.Metrics._calculate_accuracy"):
+    with (
+        mock.patch(
+            "squib.evaluation.metrics.Metrics._populate_confusion_matrix",
+        ),
+        mock.patch("squib.evaluation.metrics.Metrics._calculate_accuracy"),
+    ):
         metric = Metrics([], [])
         metric._calculate_jaccard(q_neighbors, k_neighbors)
         assert metric.jaccard == jaccard
@@ -64,9 +67,12 @@ def test_average_jaccard(k: int, feature_quantity: int) -> None:
         average_jaccard += jaccard
 
     average_jaccard /= feature_quantity * k
-    with mock.patch(
-        "squib.evaluation.metrics.Metrics._populate_confusion_matrix",
-    ), mock.patch("squib.evaluation.metrics.Metrics._calculate_accuracy"):
+    with (
+        mock.patch(
+            "squib.evaluation.metrics.Metrics._populate_confusion_matrix",
+        ),
+        mock.patch("squib.evaluation.metrics.Metrics._calculate_accuracy"),
+    ):
         metric = Metrics([], [])
         metric._calculate_average_jaccard(q_neighbors, k_neighbors)
         assert metric.average_jaccard == average_jaccard
