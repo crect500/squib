@@ -69,3 +69,4 @@ python3 experiments.py [options]
 **backend options**
 - aersimulator
 - statevectorsimulator
+- Other named Qiskit backends suitable as backend parameters to AerSimulator()
